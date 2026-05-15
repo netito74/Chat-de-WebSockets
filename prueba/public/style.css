@@ -1,0 +1,330 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f2f5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+h1, h2, h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.contenedor-app {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    width: 700px;
+    height: 500px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.barra-lateral {
+    background: #2c3e50;
+    color: white;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #ddd;
+}
+
+.barra-lateral h3 {
+    color: #ecf0f1;
+    font-size: 1.1rem;
+    border-bottom: 1px solid #34495e;
+    padding-bottom: 8px;
+}
+
+.barra-lateral ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.barra-lateral li {
+    padding: 8px 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.usuario-clicable {
+    background: #34495e;
+    cursor: pointer;
+}
+
+.usuario-clicable:hover {
+    background: #1abc9c;
+}
+
+.usuario-propio {
+    background: #7f8c8d;
+    font-style: italic;
+}
+
+/* --- Control de Scroll Estricto en la Zona de Chat --- */
+.zona-chat {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background: #ffffff;
+    height: 100%;             /* Obliga a mantener el alto del contenedor principal */
+    box-sizing: border-box;   /* Incluye el padding dentro del cálculo del alto */
+    overflow: hidden;         /* Evita que todo el bloque crezca de más */
+}
+
+.header-chat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;           /* Bloquea que el encabezado se encoja */
+}
+
+.header-chat h1 {
+    font-size: 1.3rem;
+    margin: 0;
+}
+
+#btn-volver-publico {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+/* --- Caja de Mensajes con Scroll Fijo --- */
+#mensajes {
+    border: 1px solid #ccc;
+    flex: 1;                  /* Absorbe dinámicamente todo el espacio vertical sobrante */
+    overflow-y: auto;         /* Activa el scroll vertical automático al desbordar */
+    padding: 10px;
+    margin-bottom: 5px;
+    background: #f9f9f9;
+    border-radius: 5px;
+}
+
+.mensaje {
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    font-size: 0.95rem;
+    word-wrap: break-word;
+}
+
+.publico {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+}
+
+.privado {
+    background: #fce4ec;
+    border-left: 4px solid #e91e63;
+}
+
+.info-mensaje {
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.mensaje-sistema {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    font-style: italic;
+    margin: 5px 0;
+    padding: 3px;
+    background: #f0f3f4;
+    border-radius: 3px;
+}
+
+#indicador-escribiendo {
+    height: 18px;
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    font-style: italic;
+    margin-bottom: 5px;
+    padding-left: 5px;
+    flex-shrink: 0;           /* Bloquea que el texto de escritura pierda tamaño */
+}
+
+/* --- Formulario Anclado al Fondo --- */
+.formulario {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;           /* Asegura que el formulario nunca se desplace o desaparezca */
+}
+
+input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+}
+
+input:focus {
+    border-color: #3498db;
+}
+
+button {
+    padding: 10px 15px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #2980b9;
+}
+
+button:disabled, input:disabled {
+    background: #e0e0e0;
+    cursor: not-allowed;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-contenido {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    width: 300px;
+}
+
+.modal-contenido h2 {
+    font-size: 1.4rem;
+    margin-bottom: 15px;
+}
+
+.modal-contenido input {
+    width: 90%;
+    margin-bottom: 15px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.modal-contenido button {
+    width: 100%;
+    background: #1abc9c;
+}
+
+.modal-contenido button:hover {
+    background: #16a085;
+}
+
+.oculto {
+    display: none !important;
+}
+
+.btn-menu-movil {
+    display: none;
+}
+
+/* ==========================================================================
+   📱 MEDIA QUERIES - RESPONSIVE DESIGN CORREGIDO
+   ========================================================================== */
+@media (max-width: 768px) {
+    body {
+        margin-top: 0;
+        padding: 0;
+        align-items: stretch;
+    }
+
+    .contenedor-app {
+        grid-template-columns: 1fr;
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+        position: relative;
+    }
+
+    .barra-lateral {
+        position: absolute;
+        top: 60px;
+        left: -220px;
+        width: 180px;
+        height: calc(100vh - 60px); /* Ajustado para cubrir el fondo exacto */
+        z-index: 90;
+        transition: left 0.3s ease;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+    }
+
+    .barra-lateral.activo {
+        left: 0;
+    }
+
+    .zona-chat {
+        padding: 10px;
+        height: 100vh; /* Ajuste estricto al alto completo del dispositivo */
+    }
+
+    .header-chat {
+        background: #f8f9fa;
+        padding: 10px;
+        margin-bottom: 5px;
+        border-bottom: 1px solid #ddd;
+        gap: 5px;
+    }
+
+    .header-chat h1 {
+        font-size: 1.1rem;
+        flex: 1;
+    }
+
+    .btn-menu-movil {
+        display: block !important;
+        background: #2c3e50;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        margin-right: 8px;
+    }
+
+    .formulario {
+        gap: 5px;
+        padding-bottom: env(safe-area-inset-bottom); /* Evita problemas con barras de gestos en iPhone/Android */
+    }
+
+    input {
+        padding: 12px;
+        font-size: 16px;
+    }
+
+    button {
+        padding: 12px 15px;
+    }
+}
