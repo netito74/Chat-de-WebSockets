@@ -3,222 +3,403 @@ const fs = require("fs");
 const path = require("path");
 const WebSocket = require("ws");
 
-const server = http.createServer(async (req, res) => {
-    
-    // Endpoint 1: Transferir los idiomas instalados en Docker al navegador
-    if (req.url === "/api/languages") {
-        try {
-            const response = await fetch("http://localhost:5000/languages");
-            const data = await response.json();
-            
-            res.writeHead(200, { 
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            });
-            return res.end(JSON.stringify(data));
-        } catch (error) {
-            console.error("Error consultando idiomas en Docker:", error.message);
-            res.writeHead(500, { "Content-Type": "application/json" });
-            return res.end(JSON.stringify({ error: "Error consultando los modelos de LibreTranslate" }));
-        }
-    }
+const PUERTO = 3000;
+const HOST = "0.0.0.0";
 
-    // Endpoint 2: Traducir textos individuales de la interfaz local (i18n dinámica)
-    if (req.url === "/api/translate-ui" && req.method === "POST") {
-        let body = "";
-        req.on("data", chunk => { body += chunk.toString(); });
-        req.on("end", async () => {
+const URL_LIBRE_TRANSLATE = "http://localhost:5000";
+const RUTA_PUBLICA = "./public";
+const LIMITE_HISTORIAL = 20;
+
+const clientes = new Map();
+const historialMensajes = [];
+
+const TIPOS_CONTENIDO = {
+    ".css": "text/css",
+    ".js": "application/javascript",
+    ".html": "text/html"
+};
+
+/* =========================
+   FUNCIONES AUXILIARES HTTP
+========================= */
+
+function responderJson(respuesta, codigo, datos) {
+    respuesta.writeHead(codigo, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+    });
+
+    respuesta.end(JSON.stringify(datos));
+}
+
+function obtenerContenidoTipo(rutaArchivo) {
+    const extension = path.extname(rutaArchivo);
+    return TIPOS_CONTENIDO[extension] || "text/html";
+}
+
+function leerCuerpoPeticion(peticion) {
+    return new Promise((resolver, rechazar) => {
+        let cuerpo = "";
+
+        peticion.on("data", fragmento => {
+            cuerpo += fragmento.toString();
+        });
+
+        peticion.on("end", () => {
             try {
-                const parsedBody = JSON.parse(body);
-                
-                const response = await fetch("http://localhost:5000/translate", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        q: parsedBody.text,
-                        source: "es", // Los textos base en el HTML están escritos en español
-                        target: parsedBody.target,
-                        format: "text"
-                    }),
-                    headers: { "Content-Type": "application/json" }
-                });
-
-                const data = await response.json();
-                res.writeHead(200, { 
-                    "Content-Type": "application/json", 
-                    "Access-Control-Allow-Origin": "*" 
-                });
-                res.end(JSON.stringify({ translatedText: data.translatedText }));
+                resolver(JSON.parse(cuerpo));
             } catch (error) {
-                res.writeHead(500, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ error: "Error en traducción dinámica de UI" }));
+                rechazar(error);
             }
         });
-        return;
-    }
-
-    // Enrutador de archivos estáticos nativo para el cliente web
-    let filePath = "./public/index.html";
-    if (req.url !== "/") {
-        filePath = "./public" + req.url;
-    }
-    const ext = path.extname(filePath);
-    let contentType = "text/html";
-
-    switch (ext) {
-        case ".css": contentType = "text/css"; break;
-        case ".js": contentType = "application/javascript"; break;
-    }
-
-    fs.readFile(filePath, (err, content) => {
-        if (err) {
-            res.writeHead(404);
-            res.end("Archivo no encontrado");
-        } else {
-            res.writeHead(200, { "Content-Type": contentType });
-            res.end(content, "utf-8");
-        }
     });
-});
+}
 
-const wss = new WebSocket.Server({ server });
+/* =========================
+   FUNCIONES DE TRADUCCIÓN
+========================= */
 
-// Estructuras de datos globales con soporte para idioma seleccionado
-const clientsMap = new Map(); // Guarda: ws -> { id: String, nickname: String, lang: String }
-let messageHistory = [];     
+async function obtenerIdiomas() {
+    const respuesta = await fetch(`${URL_LIBRE_TRANSLATE}/languages`);
+    return respuesta.json();
+}
 
-// Función auxiliar asíncrona para la mensajería en tiempo real usando LibreTranslate
-async function traducirTexto(texto, idiomaDestino) {
+async function traducirTexto(texto, idiomaOrigen, idiomaDestino) {
     try {
-        const response = await fetch("http://localhost:5000/translate", {
+        const respuesta = await fetch(`${URL_LIBRE_TRANSLATE}/translate`, {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({
                 q: texto,
-                source: "auto", // Identifica automáticamente el idioma del emisor
+                source: idiomaOrigen,
                 target: idiomaDestino,
                 format: "text"
-            }),
-            headers: { "Content-Type": "application/json" }
+            })
         });
 
-        if (!response.ok) return texto;
-        const data = await response.json();
-        return data.translatedText;
+        if (!respuesta.ok) {
+            return texto;
+        }
+
+        const datos = await respuesta.json();
+        return datos.translatedText;
     } catch (error) {
         console.error("Error de comunicación con LibreTranslate:", error.message);
-        return texto; 
+        return texto;
     }
 }
 
-function sendUserList() {
-    const users = Array.from(clientsMap.values()).map(u => ({ id: u.id, nickname: u.nickname }));
-    const payload = JSON.stringify({ type: "user-list", users });
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(payload);
+/* =========================
+   ENDPOINTS API
+========================= */
+
+async function manejarIdiomas(respuesta) {
+    try {
+        const idiomas = await obtenerIdiomas();
+        responderJson(respuesta, 200, idiomas);
+    } catch (error) {
+        console.error("Error consultando idiomas:", error.message);
+
+        responderJson(respuesta, 500, {
+            error: "Error consultando los modelos de LibreTranslate"
+        });
+    }
+}
+
+async function manejarTraduccionUI(peticion, respuesta) {
+    try {
+        const cuerpo = await leerCuerpoPeticion(peticion);
+
+        const textoTraducido = await traducirTexto(
+            cuerpo.text,
+            "es",
+            cuerpo.target
+        );
+
+        responderJson(respuesta, 200, {
+            translatedText: textoTraducido
+        });
+    } catch (error) {
+        responderJson(respuesta, 500, {
+            error: "Error en traducción dinámica de UI"
+        });
+    }
+}
+
+/* =========================
+   ARCHIVOS ESTÁTICOS
+========================= */
+
+function servirArchivoEstatico(peticion, respuesta) {
+    const rutaArchivo =
+        peticion.url === "/"
+            ? `${RUTA_PUBLICA}/index.html`
+            : `${RUTA_PUBLICA}${peticion.url}`;
+
+    const tipoContenido = obtenerContenidoTipo(rutaArchivo);
+
+    fs.readFile(rutaArchivo, (error, contenido) => {
+        if (error) {
+            respuesta.writeHead(404);
+            return respuesta.end("Archivo no encontrado");
         }
+
+        respuesta.writeHead(200, {
+            "Content-Type": tipoContenido
+        });
+
+        respuesta.end(contenido, "utf-8");
     });
 }
 
-function broadcastSistema(textoMsg) {
-    const payload = JSON.stringify({ type: "system", text: textoMsg });
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(payload);
-        }
+/* =========================
+   SERVIDOR HTTP
+========================= */
+
+const servidor = http.createServer(async (peticion, respuesta) => {
+    if (peticion.url === "/api/languages") {
+        return manejarIdiomas(respuesta);
+    }
+
+    if (
+        peticion.url === "/api/translate-ui" &&
+        peticion.method === "POST"
+    ) {
+        return manejarTraduccionUI(peticion, respuesta);
+    }
+
+    servirArchivoEstatico(peticion, respuesta);
+});
+
+/* =========================
+   WEBSOCKET
+========================= */
+
+const servidorWebSocket = new WebSocket.Server({
+    server: servidor
+});
+
+function generarIdCliente() {
+    return `_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function enviarACliente(cliente, datos) {
+    if (cliente.readyState === WebSocket.OPEN) {
+        cliente.send(JSON.stringify(datos));
+    }
+}
+
+function enviarListaUsuarios() {
+    const usuarios = Array.from(clientes.values()).map(usuario => ({
+        id: usuario.id,
+        nickname: usuario.nickname
+    }));
+
+    const payload = {
+        type: "user-list",
+        users: usuarios
+    };
+
+    servidorWebSocket.clients.forEach(cliente => {
+        enviarACliente(cliente, payload);
     });
 }
 
-wss.on("connection", (ws) => {
-    const clientId = "_" + Math.random().toString(36).substr(2, 9);
-    clientsMap.set(ws, { id: clientId, nickname: "Anónimo", lang: "es" });
+function enviarMensajeSistema(texto) {
+    const payload = {
+        type: "system",
+        text: texto
+    };
 
-    ws.on("message", async (message) => {
+    servidorWebSocket.clients.forEach(cliente => {
+        enviarACliente(cliente, payload);
+    });
+}
+
+function guardarMensajeHistorial(mensaje) {
+    historialMensajes.push(mensaje);
+
+    if (historialMensajes.length > LIMITE_HISTORIAL) {
+        historialMensajes.shift();
+    }
+}
+
+/* =========================
+   EVENTOS WEBSOCKET
+========================= */
+
+servidorWebSocket.on("connection", websocket => {
+    const idCliente = generarIdCliente();
+
+    clientes.set(websocket, {
+        id: idCliente,
+        nickname: "Anónimo",
+        lang: "es"
+    });
+
+    websocket.on("message", async mensaje => {
         try {
-            const data = JSON.parse(message.toString());
-            const clientInfo = clientsMap.get(ws);
+            const datos = JSON.parse(mensaje.toString());
+            const clienteActual = clientes.get(websocket);
 
-            switch (data.type) {
+            switch (datos.type) {
                 case "register":
-                    clientInfo.nickname = data.nickname;
-                    clientInfo.lang = data.lang || "es";
-                    
-                    ws.send(JSON.stringify({ type: "history", history: messageHistory }));
-                    broadcastSistema(`${clientInfo.nickname} se ha unido al chat.`);
-                    sendUserList();
+                    await manejarRegistro(websocket, clienteActual, datos);
                     break;
 
                 case "public":
-                    const horaPublico = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    
-                    const pubMsgOriginal = {
-                        type: "public",
-                        from: clientInfo.nickname,
-                        text: data.text,
-                        time: horaPublico
-                    };
-                    messageHistory.push(pubMsgOriginal);
-                    if (messageHistory.length > 20) messageHistory.shift();
-
-                    wss.clients.forEach(async (client) => {
-                        if (client.readyState === WebSocket.OPEN) {
-                            const destinoInfo = clientsMap.get(client);
-                            const textoTraducido = await traducirTexto(data.text, destinoInfo.lang);
-
-                            client.send(JSON.stringify({
-                                type: "public",
-                                from: clientInfo.nickname,
-                                text: textoTraducido,
-                                time: horaPublico
-                            }));
-                        }
-                    });
+                    await manejarMensajePublico(clienteActual, datos);
                     break;
 
                 case "private":
-                    const horaPrivado = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    
-                    wss.clients.forEach(async (client) => {
-                        const info = clientsMap.get(client);
-                        if (client.readyState === WebSocket.OPEN && (info.id === data.to || info.id === clientInfo.id)) {
-                            const textoTraducido = await traducirTexto(data.text, info.lang);
-
-                            client.send(JSON.stringify({
-                                type: "private",
-                                from: clientInfo.nickname,
-                                text: textoTraducido,
-                                time: horaPrivado
-                            }));
-                        }
-                    });
+                    await manejarMensajePrivado(clienteActual, datos);
                     break;
 
                 case "typing":
-                    wss.clients.forEach((client) => {
-                        if (client !== ws && client.readyState === WebSocket.OPEN) {
-                            client.send(JSON.stringify({
-                                type: "typing",
-                                from: clientInfo.nickname,
-                                isTyping: data.isTyping
-                            }));
-                        }
-                    });
+                    manejarEscribiendo(websocket, clienteActual, datos);
                     break;
             }
-        } catch (err) {
-            console.error("Error procesando mensaje:", err);
+        } catch (error) {
+            console.error("Error procesando mensaje:", error);
         }
     });
 
-    ws.on("close", () => {
-        const clientInfo = clientsMap.get(ws);
-        if (clientInfo) {
-            broadcastSistema(`${clientInfo.nickname} ha salido del chat.`);
-            clientsMap.delete(ws);
-            sendUserList();
-        }
+    websocket.on("close", () => {
+        manejarDesconexion(websocket);
     });
 });
 
-server.listen(3000, "0.0.0.0", () => {
-    console.log("Servidor escuchando en red local en el puerto 3000");
+/* =========================
+   MANEJADORES WEBSOCKET
+========================= */
+
+async function manejarRegistro(websocket, clienteActual, datos) {
+    clienteActual.nickname = datos.nickname;
+    clienteActual.lang = datos.lang || "es";
+
+    enviarACliente(websocket, {
+        type: "history",
+        history: historialMensajes
+    });
+
+    enviarMensajeSistema(
+        `${clienteActual.nickname} se ha unido al chat.`
+    );
+
+    enviarListaUsuarios();
+}
+
+async function manejarMensajePublico(clienteActual, datos) {
+    const hora = obtenerHoraActual();
+
+    const mensajeOriginal = {
+        type: "public",
+        from: clienteActual.nickname,
+        text: datos.text,
+        time: hora
+    };
+
+    guardarMensajeHistorial(mensajeOriginal);
+
+    servidorWebSocket.clients.forEach(async cliente => {
+        const infoDestino = clientes.get(cliente);
+
+        const textoTraducido = await traducirTexto(
+            datos.text,
+            "auto",
+            infoDestino.lang
+        );
+
+        enviarACliente(cliente, {
+            type: "public",
+            from: clienteActual.nickname,
+            text: textoTraducido,
+            time: hora
+        });
+    });
+}
+
+async function manejarMensajePrivado(clienteActual, datos) {
+    const hora = obtenerHoraActual();
+
+    servidorWebSocket.clients.forEach(async cliente => {
+        const infoDestino = clientes.get(cliente);
+
+        const esDestinatario =
+            infoDestino.id === datos.to ||
+            infoDestino.id === clienteActual.id;
+
+        if (!esDestinatario) {
+            return;
+        }
+
+        const textoTraducido = await traducirTexto(
+            datos.text,
+            "auto",
+            infoDestino.lang
+        );
+
+        enviarACliente(cliente, {
+            type: "private",
+            from: clienteActual.nickname,
+            fromId: clienteActual.id,
+            text: textoTraducido,
+            time: hora
+        });
+    });
+}
+
+function manejarEscribiendo(websocketActual, clienteActual, datos) {
+    servidorWebSocket.clients.forEach(cliente => {
+        const esOtroCliente = cliente !== websocketActual;
+
+        if (!esOtroCliente) {
+            return;
+        }
+
+        enviarACliente(cliente, {
+            type: "typing",
+            from: clienteActual.nickname,
+            isTyping: datos.isTyping
+        });
+    });
+}
+
+function manejarDesconexion(websocket) {
+    const cliente = clientes.get(websocket);
+
+    if (!cliente) {
+        return;
+    }
+
+    enviarMensajeSistema(
+        `${cliente.nickname} ha salido del chat.`
+    );
+
+    clientes.delete(websocket);
+
+    enviarListaUsuarios();
+}
+
+/* =========================
+   UTILIDADES
+========================= */
+
+function obtenerHoraActual() {
+    return new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+/* =========================
+   INICIAR SERVIDOR
+========================= */
+
+servidor.listen(PUERTO, HOST, () => {
+    console.log(
+        `Servidor escuchando en red local en el puerto ${PUERTO}`
+    );
 });

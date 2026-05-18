@@ -1,43 +1,59 @@
+/* ─── VARIABLES GLOBALES Y RESET ────────────────────────────────────────── */
+:root {
+    --primary: #3498db;
+    --primary-dark: #2980b9;
+    --dark-bg: #2c3e50;
+    --dark-item: #34495e;
+    --accent: #1abc9c;
+    --system-color: #7f8c8d;
+    --bg-app: #f0f2f5;
+    --text-main: #333;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    background: #f0f2f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-app);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
     margin: 0;
+    color: var(--text-main);
 }
 
 h1, h2, h3 {
-    margin-top: 0;
-    color: #333;
+    margin: 0;
 }
 
+/* ─── CONTENEDOR PRINCIPAL UNIFICADO ───────────────────────────────────── */
 .contenedor-app {
     display: grid;
-    grid-template-columns: 200px 1fr;
-    width: 700px;
-    height: 500px;
+    grid-template-columns: 240px 1fr;
+    width: 850px;
+    height: 600px;
     background: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
     overflow: hidden;
 }
 
+/* ─── BARRA LATERAL (CONTACTOS) ────────────────────────────────────────── */
 .barra-lateral {
-    background: #2c3e50;
+    background: var(--dark-bg);
     color: white;
-    padding: 15px;
+    padding: 20px 15px;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #ddd;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .barra-lateral h3 {
     color: #ecf0f1;
     font-size: 1.1rem;
-    border-bottom: 1px solid #34495e;
-    padding-bottom: 8px;
+    font-weight: 600;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--dark-item);
+    margin-bottom: 15px;
 }
 
 .barra-lateral ul {
@@ -48,163 +64,232 @@ h1, h2, h3 {
     flex: 1;
 }
 
+/* Formato estilizado de ítems de la lista de contactos */
 .barra-lateral li {
-    padding: 8px 10px;
-    margin-bottom: 5px;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.03);
+    transition: all 0.2s ease;
+    user-select: none;
 }
 
-.usuario-clicable {
-    background: #34495e;
-    cursor: pointer;
+.barra-lateral li:hover {
+    background: var(--dark-item);
+    transform: translateY(-1px);
 }
 
-.usuario-clicable:hover {
-    background: #1abc9c;
+.barra-lateral li:active {
+    transform: translateY(0);
 }
 
-.usuario-propio {
-    background: #7f8c8d;
-    font-style: italic;
+/* Notificación de globos flotantes de no leídos */
+.badge-usuario {
+    background: #e74c3c !important;
+    color: white !important;
+    padding: 3px 7px !important;
+    border-radius: 20px !important;
+    font-size: 0.75rem !important;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(231, 76, 60, 0.3);
+    margin-left: auto;
 }
 
-/* --- Control de Scroll Estricto en la Zona de Chat --- */
+/* ─── ZONA DE CHAT PRINCIPAL ───────────────────────────────────────────── */
 .zona-chat {
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    background: #ffffff;
-    height: 100%;             /* Obliga a mantener el alto del contenedor principal */
-    box-sizing: border-box;   /* Incluye el padding dentro del cálculo del alto */
-    overflow: hidden;         /* Evita que todo el bloque crezca de más */
+    padding: 0;
+    background: #f8f9fa;
+    height: 100%;
+    overflow: hidden;
 }
 
 .header-chat {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-    flex-shrink: 0;           /* Bloquea que el encabezado se encoja */
+    padding: 15px 20px;
+    background: white;
+    border-bottom: 1px solid #eaeaea;
+    flex-shrink: 0;
+}
+
+.contenedor-titulo-chat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .header-chat h1 {
-    font-size: 1.3rem;
-    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
 }
 
 #btn-volver-publico {
-    background: #e74c3c;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 5px 10px;
-    font-size: 0.8rem;
-    cursor: pointer;
-}
-
-/* --- Caja de Mensajes con Scroll Fijo --- */
-#mensajes {
-    border: 1px solid #ccc;
-    flex: 1;                  /* Absorbe dinámicamente todo el espacio vertical sobrante */
-    overflow-y: auto;         /* Activa el scroll vertical automático al desbordar */
-    padding: 10px;
-    margin-bottom: 5px;
-    background: #f9f9f9;
-    border-radius: 5px;
-}
-
-.mensaje {
-    padding: 8px;
-    margin-bottom: 5px;
-    border-radius: 5px;
-    font-size: 0.95rem;
-    word-wrap: break-word;
-}
-
-.publico {
-    background: #e3f2fd;
-    border-left: 4px solid #2196f3;
-}
-
-.privado {
-    background: #fce4ec;
-    border-left: 4px solid #e91e63;
-}
-
-.info-mensaje {
-    font-weight: bold;
+    background: #f1f3f5;
+    color: #495057;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 6px 12px;
     font-size: 0.85rem;
-    color: #555;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
-.mensaje-sistema {
-    text-align: center;
+#btn-volver-publico:hover {
+    background: #e2e6ea;
+    color: #212529;
+}
+
+/* ─── CAJA DE MENSAJES (SALA UNIFICADA) ────────────────────────────────── */
+#mensajes {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: #f4f6f8;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Mensajes Estándar (Globos de conversación asimétricos) */
+
+
+/* ─── GLOBOS DE MENSAJE ESTILO WHATSAPP ────────────────────────────────── */
+.mensaje {
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    word-wrap: break-word;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    align-self: flex-start;
+    background: white;
+    border-top-left-radius: 0; /* Pico del globo a la izquierda */
+    
+    /* Configuración Flexbox para ordenar el contenido verticalmente */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Nombre del remitente en la parte superior */
+.mensaje strong {
+    display: block;
     font-size: 0.8rem;
-    color: #7f8c8d;
-    font-style: italic;
-    margin: 5px 0;
-    padding: 3px;
-    background: #f0f3f4;
-    border-radius: 3px;
+    color: #e53935; /* Color distintivo para nombres */
+    margin-bottom: 2px;
 }
 
+/* El párrafo del contenido principal */
+.mensaje p {
+    margin: 0;
+    padding-right: 25px; /* Espacio de seguridad para que el texto no tape la hora */
+}
+
+/* La hora abajo a la derecha */
+.mensaje span {
+    display: block;
+    font-size: 0.7rem;
+    color: #8696a0; /* Gris estilo WhatsApp */
+    align-self: flex-end; /* Lo empuja por completo a la derecha */
+    margin-top: 4px;
+    margin-bottom: -2px;
+    user-select: none;
+}
+
+/* ─── VARIACIÓN SI EL MENSAJE ES MÍO (LADO DERECHO) ────────────────────── */
+.mensaje.mio {
+    align-self: flex-end;
+    background: #b3b1b1; /* Verde claro característico de WhatsApp */
+    border-top-left-radius: 8px;
+    border-top-right-radius: 0; /* Pico del globo a la derecha */
+}
+
+/* Ocultar tu propio nombre en tus burbujas para limpiar la interfaz */
+.mensaje.mio strong {
+    display: none;
+}
+
+.mensaje.mio span {
+    color: #667781; /* Tono de hora ligeramente diferente para burbuja verde */
+}
+
+
+/* Indicador dinámico de escritura */
 #indicador-escribiendo {
-    height: 18px;
+    height: 20px;
     font-size: 0.8rem;
-    color: #7f8c8d;
+    color: var(--system-color);
     font-style: italic;
+    padding: 0 20px;
     margin-bottom: 5px;
-    padding-left: 5px;
-    flex-shrink: 0;           /* Bloquea que el texto de escritura pierda tamaño */
+    flex-shrink: 0;
 }
 
-/* --- Formulario Anclado al Fondo --- */
+/* ─── FORMULARIO GENERAL ────────────────────────────────────────────────── */
 .formulario {
     display: flex;
     gap: 10px;
-    flex-shrink: 0;           /* Asegura que el formulario nunca se desplace o desaparezca */
+    padding: 15px 20px;
+    background: white;
+    border-top: 1px solid #eaeaea;
+    flex-shrink: 0;
 }
 
 input {
     flex: 1;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 12px 16px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
     outline: none;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
 }
 
 input:focus {
-    border-color: #3498db;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
 }
 
 button {
-    padding: 10px 15px;
-    background: #3498db;
+    padding: 0 20px;
+    background: var(--primary);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: background 0.2s;
 }
 
 button:hover {
-    background: #2980b9;
+    background: var(--primary-dark);
 }
 
 button:disabled, input:disabled {
-    background: #e0e0e0;
+    background: #e9ecef;
+    color: #adb5bd;
     cursor: not-allowed;
+    border-color: #dee2e6;
 }
 
+/* ─── MODAL DE LOGIN INITIAL ───────────────────────────────────────────── */
 .modal {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(33, 37, 41, 0.6);
+    backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -214,28 +299,28 @@ button:disabled, input:disabled {
 .modal-contenido {
     background: white;
     padding: 30px;
-    border-radius: 8px;
+    border-radius: 12px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    width: 300px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    width: 320px;
 }
 
 .modal-contenido h2 {
     font-size: 1.4rem;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+    font-weight: 600;
 }
 
 .modal-contenido input {
-    width: 90%;
+    width: 100%;
+    box-sizing: border-box;
     margin-bottom: 15px;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 .modal-contenido button {
     width: 100%;
-    background: #1abc9c;
+    padding: 12px;
+    background: var(--accent);
 }
 
 .modal-contenido button:hover {
@@ -250,13 +335,9 @@ button:disabled, input:disabled {
     display: none;
 }
 
-/* ==========================================================================
-   📱 MEDIA QUERIES - RESPONSIVE DESIGN CORREGIDO
-   ========================================================================== */
+/* ─── MEDIA QUERIES (SOPORTE DISPOSITIVOS MÓVILES) ───────────────────────── */
 @media (max-width: 768px) {
     body {
-        margin-top: 0;
-        padding: 0;
         align-items: stretch;
     }
 
@@ -265,19 +346,17 @@ button:disabled, input:disabled {
         width: 100vw;
         height: 100vh;
         border-radius: 0;
-        box-shadow: none;
-        position: relative;
     }
 
     .barra-lateral {
         position: absolute;
         top: 60px;
-        left: -220px;
-        width: 180px;
-        height: calc(100vh - 60px); /* Ajustado para cubrir el fondo exacto */
+        left: -250px;
+        width: 210px;
+        height: calc(100vh - 60px);
         z-index: 90;
-        transition: left 0.3s ease;
-        box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+        transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 8px 0 20px rgba(0,0,0,0.15);
     }
 
     .barra-lateral.activo {
@@ -285,46 +364,26 @@ button:disabled, input:disabled {
     }
 
     .zona-chat {
-        padding: 10px;
-        height: 100vh; /* Ajuste estricto al alto completo del dispositivo */
+        height: 100vh;
     }
 
     .header-chat {
-        background: #f8f9fa;
-        padding: 10px;
-        margin-bottom: 5px;
-        border-bottom: 1px solid #ddd;
-        gap: 5px;
-    }
-
-    .header-chat h1 {
-        font-size: 1.1rem;
-        flex: 1;
+        padding: 12px;
     }
 
     .btn-menu-movil {
         display: block !important;
-        background: #2c3e50;
+        background: var(--dark-bg);
         color: white;
         border: none;
         padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        cursor: pointer;
-        margin-right: 8px;
+        border-radius: 6px;
+        font-size: 0.85rem;
     }
 
     .formulario {
-        gap: 5px;
-        padding-bottom: env(safe-area-inset-bottom); /* Evita problemas con barras de gestos en iPhone/Android */
-    }
-
-    input {
         padding: 12px;
-        font-size: 16px;
-    }
-
-    button {
-        padding: 12px 15px;
+        gap: 8px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
     }
 }
