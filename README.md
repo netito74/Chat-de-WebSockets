@@ -98,21 +98,62 @@ Los usuarios pueden modificar la apariencia del chat.
 # 🔧 Requsitos 🪛
 - node.js
 - Docker
+- LibreTranslate
 
 ---
 
-# ⚙️ Instalación y Ejecución
+## Instalación y ejecución
+
+### 1. Clonar el repositorio principal
 
 
----
-
-# 📂 Estructura del Proyecto
-
-```plaintext
-
+git clone https://github.com/usuario/proyecto.git
+cd proyecto
 ```
 
----
+### 2. Clonar la librería auxiliar
+
+```bash
+git clone https://github.com/usuario/libreria-auxiliar.git
+```
+
+### 3. Modificar archivo de configuración de la librería
+
+Editar el archivo correspondiente de la librería auxiliar:
+
+```bash
+nano libreria-auxiliar/ruta/del/archivo.ext
+```
+
+Realizar los cambios necesarios y guardar el archivo.
+
+### 4. Ejecutar la librería auxiliar
+
+```bash
+cd libreria-auxiliar
+npm install
+npm run dev
+```
+
+Mantener este proceso en ejecución.
+
+### 5. Ejecutar el proyecto principal
+
+Abrir otra terminal y ejecutar:
+
+```bash
+cd proyecto
+npm install
+npm run dev
+```
+
+### 6. Acceder a la aplicación
+
+Una vez iniciado el proyecto, acceder desde el navegador a:
+
+```bash
+http://localhost:3000
+```
 
 # 📸 Evidencias de Funcionamiento
 
