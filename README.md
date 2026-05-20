@@ -119,20 +119,39 @@ git clone https://github.com/LibreTranslate/LibreTranslate.git
 
 ### 3. Modificar archivo de configuración de la librería
 
-Editar el archivo correspondiente de la librería auxiliar:
+Editar el archivo doker-compose.yml de LibreTranslate:
 
 ```bash
-nano libreria-auxiliar/ruta/del/archivo.ext
+nano LibreTranslate\docker-compose.yml
 ```
 
-Realizar los cambios necesarios y guardar el archivo.
+Remplazar el contenido por:
+
+```bash
+services:
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: libretranslate
+
+    ports:
+      - "5000:5000"
+
+    environment:
+      - LT_LOAD_ONLY=es,en,fr,de,it,pt
+      - LT_UPDATE_MODELS=true
+
+    volumes:
+      - libretranslate_models:/home/libretranslate/.local
+
+volumes:
+  libretranslate_models:
+```
 
 ### 4. Ejecutar la librería auxiliar
 
 ```bash
 cd LibreTranslate
-npm install
-npm run dev
+docker-compose up -d
 ```
 
 Mantener este proceso en ejecución.
@@ -142,9 +161,8 @@ Mantener este proceso en ejecución.
 Abrir otra terminal y ejecutar:
 
 ```bash
-cd proyecto
-npm install
-npm run dev
+cd Chat-de-WebSockets
+-- comandos por añadir
 ```
 
 ### 6. Acceder a la aplicación
