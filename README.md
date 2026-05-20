@@ -106,15 +106,15 @@ Los usuarios pueden modificar la apariencia del chat.
 
 ### 1. Clonar el repositorio principal
 
-
-git clone https://github.com/usuario/proyecto.git
-cd proyecto
+```bash
+git clone https://github.com/netito74/Chat-de-WebSockets.git
+cd Chat-de-WebSockets
 ```
 
 ### 2. Clonar la librería auxiliar
 
 ```bash
-git clone https://github.com/usuario/libreria-auxiliar.git
+git clone https://github.com/LibreTranslate/LibreTranslate.git
 ```
 
 ### 3. Modificar archivo de configuración de la librería
@@ -130,7 +130,7 @@ Realizar los cambios necesarios y guardar el archivo.
 ### 4. Ejecutar la librería auxiliar
 
 ```bash
-cd libreria-auxiliar
+cd LibreTranslate
 npm install
 npm run dev
 ```
