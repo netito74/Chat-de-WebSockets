@@ -147,7 +147,7 @@ volumes:
   libretranslate_models:
 ```
 
-### 4. Ejecutar la librería auxiliar
+### 4. Ejecutar LibreTranslate
 
 ```bash
 cd LibreTranslate
@@ -162,7 +162,8 @@ Abrir otra terminal y ejecutar:
 
 ```bash
 cd Chat-de-WebSockets
--- comandos por añadir
+npm install
+node server.js
 ```
 
 ### 6. Acceder a la aplicación
