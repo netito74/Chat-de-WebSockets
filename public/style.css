@@ -37,7 +37,7 @@ h1, h2, h3 {
     overflow: hidden;
 }
 
-/* ─── BARRA LATERAL (CONTACTOS) ────────────────────────────────────────── */
+/* ─── BARRA LATERAL (MULTIFUNCIÓN) ─────────────────────────────────────── */
 .barra-lateral {
     background: var(--dark-bg);
     color: white;
@@ -45,6 +45,13 @@ h1, h2, h3 {
     display: flex;
     flex-direction: column;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
+    overflow-y: auto; /* Permite scroll general si hay muchos canales y usuarios */
+}
+
+/* Contenedores de secciones internas */
+.seccion-canales, .seccion-usuarios {
+    display: flex;
+    flex-direction: column;
 }
 
 .barra-lateral h3 {
@@ -60,11 +67,9 @@ h1, h2, h3 {
     list-style: none;
     padding: 0;
     margin: 0;
-    overflow-y: auto;
-    flex: 1;
 }
 
-/* Formato estilizado de ítems de la lista de contactos */
+/* Formato estilizado de ítems de las listas (Canales y Usuarios) */
 .barra-lateral li {
     display: flex;
     align-items: center;
@@ -76,6 +81,7 @@ h1, h2, h3 {
     background: rgba(255, 255, 255, 0.03);
     transition: all 0.2s ease;
     user-select: none;
+    cursor: pointer;
 }
 
 .barra-lateral li:hover {
@@ -97,6 +103,22 @@ h1, h2, h3 {
     font-weight: bold;
     box-shadow: 0 2px 5px rgba(231, 76, 60, 0.3);
     margin-left: auto;
+}
+
+/* Estilo para el botón de crear canal en la barra lateral */
+#btn-crear-canal {
+    padding: 10px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#btn-crear-canal:hover {
+    background: #16a085;
 }
 
 /* ─── ZONA DE CHAT PRINCIPAL ───────────────────────────────────────────── */
@@ -158,9 +180,6 @@ h1, h2, h3 {
     gap: 12px;
 }
 
-/* Mensajes Estándar (Globos de conversación asimétricos) */
-
-
 /* ─── GLOBOS DE MENSAJE ESTILO WHATSAPP ────────────────────────────────── */
 .mensaje {
     max-width: 75%;
@@ -173,8 +192,6 @@ h1, h2, h3 {
     align-self: flex-start;
     background: white;
     border-top-left-radius: 0; /* Pico del globo a la izquierda */
-    
-    /* Configuración Flexbox para ordenar el contenido verticalmente */
     display: flex;
     flex-direction: column;
 }
@@ -207,7 +224,7 @@ h1, h2, h3 {
 /* ─── VARIACIÓN SI EL MENSAJE ES MÍO (LADO DERECHO) ────────────────────── */
 .mensaje.mio {
     align-self: flex-end;
-    background: #b3b1b1; /* Verde claro característico de WhatsApp */
+    background: #b3b1b1; 
     border-top-left-radius: 8px;
     border-top-right-radius: 0; /* Pico del globo a la derecha */
 }
@@ -220,7 +237,6 @@ h1, h2, h3 {
 .mensaje.mio span {
     color: #667781; /* Tono de hora ligeramente diferente para burbuja verde */
 }
-
 
 /* Indicador dinámico de escritura */
 #indicador-escribiendo {
@@ -378,12 +394,7 @@ button:disabled, input:disabled {
         border: none;
         padding: 8px 12px;
         border-radius: 6px;
-        font-size: 0.85rem;
-    }
-
-    .formulario {
-        padding: 12px;
-        gap: 8px;
-        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        font-weight: 600;
+        cursor: pointer;
     }
 }

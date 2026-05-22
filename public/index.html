@@ -27,16 +27,32 @@
     <!-- Contenedor Principal Unificado -->
     <div class="contenedor-app">
 
-        <!-- Barra Lateral de Usuarios Conectados -->
+        <!-- Barra Lateral Multifunción -->
         <aside class="barra-lateral">
-            <h3>Conectados</h3>
-            <ul id="lista-usuarios"></ul>
+            
+           
+            
+            <!-- Sección de Usuarios Traducible -->
+            <div class="seccion-usuarios" style="margin-top: 20px;">
+                <h3 id="titulo-conectados">Conectados</h3>
+                <ul id="lista-usuarios"></ul>
+            </div>
+
+             <!-- NUEVA: Sección de Canales Traducible -->
+            <div class="seccion-canales">
+                <h3 id="titulo-canales">Canales</h3>
+                <button id="btn-crear-canal" style="width: 100%; margin-bottom: 10px;">+ Crear Canal</button>
+                <ul id="lista-canales"></ul>
+            </div>
+
         </aside>
 
-        <!-- Zona Única de Chat (Maneja Público y Privado) -->
-        <main class="zona-chat">
+        <!-- Zona Única de Chat -->
+        <!-- data-tipo-sala: controla si es "publica", "privada" o "canal" -->
+        <!-- data-creador-canal: almacena el nickname del dueño del canal activo -->
+        <main class="zona-chat" id="zona-chat" data-tipo-sala="publica" data-creador-canal="">
             <header class="header-chat">
-                <button id="btn-menu" class="btn-menu-movil">👥 Usuarios</button>
+                <button id="btn-menu" class="btn-menu-movil">👥 Menú</button>
                 
                 <div class="contenedor-titulo-chat">
                     <h1 id="chat-titulo">Sala Pública</h1>
