@@ -1,83 +1,80 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat WebSocket Avanzado</title>
+    <title>Chat WebSocket</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-    <!-- Modal de Registro de Usuario -->
+    <!-- Modal de registro: nickname + idioma -->
     <div id="modal-login" class="modal">
         <div class="modal-contenido">
             <h2>Ingresa al Chat</h2>
             <input type="text" id="nickname-input" placeholder="Tu Nickname / Apodo">
-            <label for="idioma-input" style="display:block;margin-bottom:5px;font-size:0.9rem;color:#666;text-align:left;padding-left:15px;">
-                Idioma en el que deseas leer:
-            </label>
-            <select id="idioma-input" style="width:90%;padding:10px;margin-bottom:15px;border-radius:4px;border:1px solid #ccc;background:white;">
-            </select>
+            <label for="idioma-input" class="label-idioma">Idioma en el que deseas leer:</label>
+            <select id="idioma-input"></select>
             <button id="btnEntrar">Unirse</button>
         </div>
     </div>
 
-    <!-- Contenedor Principal Unificado -->
+    <!-- Contenedor principal: barra lateral + zona de chat -->
     <div class="contenedor-app">
 
-        <!-- Barra Lateral Multifunción -->
+        <!-- Barra lateral: usuarios conectados y canales -->
         <aside class="barra-lateral">
-            
-           
-            
-            <!-- Sección de Usuarios Traducible -->
-            <div class="seccion-usuarios" style="margin-top: 20px;">
+
+            <!-- Lista de usuarios conectados -->
+            <div class="seccion-usuarios">
                 <h3 id="titulo-conectados">Conectados</h3>
                 <ul id="lista-usuarios"></ul>
             </div>
 
-             <!-- NUEVA: Sección de Canales Traducible -->
+            <!-- Lista de canales (solo el creador puede escribir) -->
             <div class="seccion-canales">
                 <h3 id="titulo-canales">Canales</h3>
-                <button id="btn-crear-canal" style="width: 100%; margin-bottom: 10px;">+ Crear Canal</button>
+                <button id="btn-crear-canal">＋ Crear Canal</button>
+                
+                <!-- NUEVO: Formulario oculto para ingresar el nombre -->
+                <div id="contenedor-crear-canal" style="display: none; margin: 10px 0;">
+                    <input type="text" id="input-nombre-canal" style="width: 100%; margin-bottom: 5px;">
+                    <div style="display: flex; gap: 5px;">
+                        <button id="btn-confirmar-crear" style="flex: 1;">OK</button>
+                        <button id="btn-cancelar-crear" style="flex: 1;">X</button>
+                    </div>
+                </div>
+
                 <ul id="lista-canales"></ul>
             </div>
 
+
         </aside>
 
-        <!-- Zona Única de Chat -->
-        <!-- data-tipo-sala: controla si es "publica", "privada" o "canal" -->
-        <!-- data-creador-canal: almacena el nickname del dueño del canal activo -->
-        <main class="zona-chat" id="zona-chat" data-tipo-sala="publica" data-creador-canal="">
+        <!-- Zona de chat (cambia entre: pública, privada y canal) -->
+        <main class="zona-chat" id="zona-chat">
+
             <header class="header-chat">
-                <button id="btn-menu" class="btn-menu-movil">👥 Menú</button>
-                
+                <button id="btn-menu" class="btn-menu-movil">Menú</button>
                 <div class="contenedor-titulo-chat">
                     <h1 id="chat-titulo">Sala Pública</h1>
-                    <span id="badge-privados" class="badge-privados oculto">0</span>
                 </div>
-
-                <!-- Modificado: Se quitó la clase 'oculto' nativa para manejar su visibilidad con JS (display: none/block) -->
-                <button id="btn-volver-publico" style="display: none;">Volver a Sala Pública</button>
+                <button id="btn-volver-publico" style="display:none;">Volver a Sala Pública</button>
             </header>
 
-            <!-- Ventana Única de Mensajes -->
+            <!-- Ventana de mensajes -->
             <div id="mensajes"></div>
-
             <div id="indicador-escribiendo"></div>
 
-            <!-- Entrada de Texto Única -->
+            <!-- Entrada de texto -->
             <div class="formulario">
                 <input type="text" id="texto" placeholder="Escribe un mensaje aquí..." disabled>
                 <button id="btnEnviar" disabled>Enviar</button>
             </div>
-        </main>
 
+        </main>
     </div>
 
     <script src="app.js"></script>
 </body>
-
 </html>

@@ -1,405 +1,309 @@
 const http = require("http");
-const fs = require("fs");
+const fs   = require("fs");
 const path = require("path");
 const WebSocket = require("ws");
 
-const PUERTO = 3000;
-const HOST = "0.0.0.0";
+/* ── CONFIGURACIÓN ──────────────────────────────────────────────────────── */
 
+const PUERTO           = 3000;
+const HOST             = "0.0.0.0";
 const URL_LIBRE_TRANSLATE = "http://localhost:5000";
-const RUTA_PUBLICA = "./public";
+const RUTA_PUBLICA     = "./public";
 const LIMITE_HISTORIAL = 20;
 
-const clientes = new Map();
-const historialMensajes = [];
-
 const TIPOS_CONTENIDO = {
-    ".css": "text/css",
-    ".js": "application/javascript",
-    ".html": "text/html"
+    ".css":  "text/css",
+    ".js":   "application/javascript",
+    ".html": "text/html",
 };
 
-/* =========================
-   FUNCIONES AUXILIARES HTTP
-========================= */
+/* ── ESTADO DEL SERVIDOR ────────────────────────────────────────────────── */
 
-function responderJson(respuesta, codigo, datos) {
-    respuesta.writeHead(codigo, {
+// Map<WebSocket, { id, nickname, lang }>
+const clientes = new Map();
+
+// Map<canalId, { id, nombre, creadorId, historial: [] }>
+const canales = new Map();
+
+// Historial de la sala pública (últimos N mensajes)
+const historialPublico = [];
+
+/* ── UTILIDADES HTTP ────────────────────────────────────────────────────── */
+
+// Envía respuesta JSON con código de estado
+function responderJson(res, codigo, datos) {
+    res.writeHead(codigo, {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
+        "Access-Control-Allow-Origin": "*",
     });
-
-    respuesta.end(JSON.stringify(datos));
+    res.end(JSON.stringify(datos));
 }
 
-function obtenerContenidoTipo(rutaArchivo) {
-    const extension = path.extname(rutaArchivo);
-    return TIPOS_CONTENIDO[extension] || "text/html";
-}
-
-function leerCuerpoPeticion(peticion) {
-    return new Promise((resolver, rechazar) => {
-        let cuerpo = "";
-
-        peticion.on("data", fragmento => {
-            cuerpo += fragmento.toString();
-        });
-
-        peticion.on("end", () => {
-            try {
-                resolver(JSON.parse(cuerpo));
-            } catch (error) {
-                rechazar(error);
-            }
+// Parsea el body de la petición como JSON
+function leerCuerpo(req) {
+    return new Promise((ok, fail) => {
+        let raw = "";
+        req.on("data", chunk => (raw += chunk.toString()));
+        req.on("end", () => {
+            try { ok(JSON.parse(raw)); }
+            catch (e) { fail(e); }
         });
     });
 }
 
-/* =========================
-   FUNCIONES DE TRADUCCIÓN
-========================= */
+/* ── TRADUCCIÓN (LibreTranslate) ────────────────────────────────────────── */
 
+// Consulta los idiomas disponibles al servidor LibreTranslate
 async function obtenerIdiomas() {
-    const respuesta = await fetch(`${URL_LIBRE_TRANSLATE}/languages`);
-    return respuesta.json();
+    const res = await fetch(`${URL_LIBRE_TRANSLATE}/languages`);
+    return res.json();
 }
 
-async function traducirTexto(texto, idiomaOrigen, idiomaDestino) {
+// Traduce `texto` del idioma origen al destino.
+// Devuelve el texto original si falla para no romper el flujo.
+async function traducir(texto, origen, destino) {
+    // Evita llamada innecesaria si el destino es el mismo idioma
+    if (origen !== "auto" && origen === destino) return texto;
+
     try {
-        const respuesta = await fetch(`${URL_LIBRE_TRANSLATE}/translate`, {
+        const res = await fetch(`${URL_LIBRE_TRANSLATE}/translate`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                q: texto,
-                source: idiomaOrigen,
-                target: idiomaDestino,
-                format: "text"
-            })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: texto, source: origen, target: destino, format: "text" }),
         });
-
-        if (!respuesta.ok) {
-            return texto;
-        }
-
-        const datos = await respuesta.json();
-        return datos.translatedText;
-    } catch (error) {
-        console.error("Error de comunicación con LibreTranslate:", error.message);
+        if (!res.ok) return texto;
+        const datos = await res.json();
+        return datos.translatedText || texto;
+    } catch (err) {
+        console.error("Error LibreTranslate:", err.message);
         return texto;
     }
 }
 
-/* =========================
-   ENDPOINTS API
-========================= */
+/* ── SERVIDOR HTTP ──────────────────────────────────────────────────────── */
 
-async function manejarIdiomas(respuesta) {
-    try {
-        const idiomas = await obtenerIdiomas();
-        responderJson(respuesta, 200, idiomas);
-    } catch (error) {
-        console.error("Error consultando idiomas:", error.message);
-
-        responderJson(respuesta, 500, {
-            error: "Error consultando los modelos de LibreTranslate"
-        });
-    }
-}
-
-async function manejarTraduccionUI(peticion, respuesta) {
-    try {
-        const cuerpo = await leerCuerpoPeticion(peticion);
-
-        const textoTraducido = await traducirTexto(
-            cuerpo.text,
-            "es",
-            cuerpo.target
-        );
-
-        responderJson(respuesta, 200, {
-            translatedText: textoTraducido
-        });
-    } catch (error) {
-        responderJson(respuesta, 500, {
-            error: "Error en traducción dinámica de UI"
-        });
-    }
-}
-
-/* =========================
-   ARCHIVOS ESTÁTICOS
-========================= */
-
-function servirArchivoEstatico(peticion, respuesta) {
-    const rutaArchivo =
-        peticion.url === "/"
-            ? `${RUTA_PUBLICA}/index.html`
-            : `${RUTA_PUBLICA}${peticion.url}`;
-
-    const tipoContenido = obtenerContenidoTipo(rutaArchivo);
-
-    fs.readFile(rutaArchivo, (error, contenido) => {
-        if (error) {
-            respuesta.writeHead(404);
-            return respuesta.end("Archivo no encontrado");
-        }
-
-        respuesta.writeHead(200, {
-            "Content-Type": tipoContenido
-        });
-
-        respuesta.end(contenido, "utf-8");
-    });
-}
-
-/* =========================
-   SERVIDOR HTTP
-========================= */
-
-const servidor = http.createServer(async (peticion, respuesta) => {
-    if (peticion.url === "/api/languages") {
-        return manejarIdiomas(respuesta);
-    }
-
-    if (
-        peticion.url === "/api/translate-ui" &&
-        peticion.method === "POST"
-    ) {
-        return manejarTraduccionUI(peticion, respuesta);
-    }
-
-    servirArchivoEstatico(peticion, respuesta);
-});
-
-/* =========================
-   WEBSOCKET
-========================= */
-
-const servidorWebSocket = new WebSocket.Server({
-    server: servidor
-});
-
-function generarIdCliente() {
-    return `_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-function enviarACliente(cliente, datos) {
-    if (cliente.readyState === WebSocket.OPEN) {
-        cliente.send(JSON.stringify(datos));
-    }
-}
-
-function enviarListaUsuarios() {
-    const usuarios = Array.from(clientes.values()).map(usuario => ({
-        id: usuario.id,
-        nickname: usuario.nickname
-    }));
-
-    const payload = {
-        type: "user-list",
-        users: usuarios
-    };
-
-    servidorWebSocket.clients.forEach(cliente => {
-        enviarACliente(cliente, payload);
-    });
-}
-
-function enviarMensajeSistema(texto) {
-    const payload = {
-        type: "system",
-        text: texto
-    };
-
-    servidorWebSocket.clients.forEach(cliente => {
-        enviarACliente(cliente, payload);
-    });
-}
-
-function guardarMensajeHistorial(mensaje) {
-    historialMensajes.push(mensaje);
-
-    if (historialMensajes.length > LIMITE_HISTORIAL) {
-        historialMensajes.shift();
-    }
-}
-
-/* =========================
-   EVENTOS WEBSOCKET
-========================= */
-
-servidorWebSocket.on("connection", websocket => {
-    const idCliente = generarIdCliente();
-
-    clientes.set(websocket, {
-        id: idCliente,
-        nickname: "Anónimo",
-        lang: "es"
-    });
-
-    websocket.on("message", async mensaje => {
+const servidor = http.createServer(async (req, res) => {
+    // GET /api/languages → lista de idiomas disponibles
+    if (req.url === "/api/languages") {
         try {
-            const datos = JSON.parse(mensaje.toString());
-            const clienteActual = clientes.get(websocket);
-
-            switch (datos.type) {
-                case "register":
-                    await manejarRegistro(websocket, clienteActual, datos);
-                    break;
-
-                case "public":
-                    await manejarMensajePublico(clienteActual, datos);
-                    break;
-
-                case "private":
-                    await manejarMensajePrivado(clienteActual, datos);
-                    break;
-
-                case "typing":
-                    manejarEscribiendo(websocket, clienteActual, datos);
-                    break;
-            }
-        } catch (error) {
-            console.error("Error procesando mensaje:", error);
+            return responderJson(res, 200, await obtenerIdiomas());
+        } catch {
+            return responderJson(res, 500, { error: "No se pudieron obtener los idiomas" });
         }
-    });
+    }
 
-    websocket.on("close", () => {
-        manejarDesconexion(websocket);
+    // POST /api/translate-ui → traduce textos estáticos de la interfaz
+    if (req.url === "/api/translate-ui" && req.method === "POST") {
+        try {
+            const { text, target } = await leerCuerpo(req);
+            return responderJson(res, 200, {
+                translatedText: await traducir(text, "es", target),
+            });
+        } catch {
+            return responderJson(res, 500, { error: "Error de traducción" });
+        }
+    }
+
+    // Archivos estáticos (HTML, CSS, JS del cliente)
+    const ruta = req.url === "/" ? `${RUTA_PUBLICA}/index.html` : `${RUTA_PUBLICA}${req.url}`;
+    const tipo = TIPOS_CONTENIDO[path.extname(ruta)] || "text/html";
+    fs.readFile(ruta, (err, contenido) => {
+        if (err) { res.writeHead(404); return res.end("No encontrado"); }
+        res.writeHead(200, { "Content-Type": tipo });
+        res.end(contenido, "utf-8");
     });
 });
 
-/* =========================
-   MANEJADORES WEBSOCKET
-========================= */
+/* ── WEBSOCKET ──────────────────────────────────────────────────────────── */
 
-async function manejarRegistro(websocket, clienteActual, datos) {
-    clienteActual.nickname = datos.nickname;
-    clienteActual.lang = datos.lang || "es";
+const wss = new WebSocket.Server({ server: servidor });
 
-    enviarACliente(websocket, {
-        type: "history",
-        history: historialMensajes
-    });
+// ID único de 9 caracteres para cada cliente/canal
+const generarId = () => `_${Math.random().toString(36).substring(2, 11)}`;
 
-    enviarMensajeSistema(
-        `${clienteActual.nickname} se ha unido al chat.`
-    );
-
-    enviarListaUsuarios();
+// Envía datos JSON a un WebSocket solo si está abierto
+function enviar(ws, datos) {
+    if (ws.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify(datos));
 }
 
-async function manejarMensajePublico(clienteActual, datos) {
-    const hora = obtenerHoraActual();
-
-    const mensajeOriginal = {
-        type: "public",
-        from: clienteActual.nickname,
-        text: datos.text,
-        time: hora
-    };
-
-    guardarMensajeHistorial(mensajeOriginal);
-
-    servidorWebSocket.clients.forEach(async cliente => {
-        const infoDestino = clientes.get(cliente);
-
-        const textoTraducido = await traducirTexto(
-            datos.text,
-            "auto",
-            infoDestino.lang
-        );
-
-        enviarACliente(cliente, {
-            type: "public",
-            from: clienteActual.nickname,
-            text: textoTraducido,
-            time: hora
-        });
-    });
+// Envía el mismo payload a todos los clientes conectados
+function broadcast(payload) {
+    wss.clients.forEach(ws => enviar(ws, payload));
 }
 
-async function manejarMensajePrivado(clienteActual, datos) {
-    const hora = obtenerHoraActual();
+// Envía la lista actualizada de usuarios a todos
+function emitirListaUsuarios() {
+    const users = Array.from(clientes.values()).map(c => ({
+        id: c.id, nickname: c.nickname,
+    }));
+    broadcast({ type: "user-list", users });
+}
 
-    servidorWebSocket.clients.forEach(async cliente => {
-        const infoDestino = clientes.get(cliente);
+// Envía la lista completa de canales a todos
+function emitirListaCanales() {
+    const lista = Array.from(canales.values()).map(c => ({
+        id: c.id, nombre: c.nombre, creadorId: c.creadorId,
+    }));
+    broadcast({ type: "channel-list", channels: lista });
+}
 
-        const esDestinatario =
-            infoDestino.id === datos.to ||
-            infoDestino.id === clienteActual.id;
+// Guarda mensaje en el historial y descarta el más antiguo si excede el límite
+function guardarEnHistorial(historial, mensaje) {
+    historial.push(mensaje);
+    if (historial.length > LIMITE_HISTORIAL) historial.shift();
+}
 
-        if (!esDestinatario) {
-            return;
+/* ── CONEXIÓN ───────────────────────────────────────────────────────────── */
+
+wss.on("connection", ws => {
+    const id = generarId();
+    clientes.set(ws, { id, nickname: "Anónimo", lang: "es" });
+
+    ws.on("message", async raw => {
+        try {
+            const datos  = JSON.parse(raw.toString());
+            const cliente = clientes.get(ws);
+
+            // Despacha cada tipo de mensaje a su manejador
+            const handlers = {
+                register:        () => manejarRegistro(ws, cliente, datos),
+                public:          () => manejarPublico(cliente, datos),
+                private:         () => manejarPrivado(cliente, datos),
+                typing:          () => manejarTyping(ws, cliente, datos),
+                "channel-create": () => manejarCrearCanal(ws, cliente, datos),
+                "channel-msg":   () => manejarMensajeCanal(cliente, datos),
+            };
+
+            if (handlers[datos.type]) await handlers[datos.type]();
+        } catch (err) {
+            console.error("Error procesando mensaje WS:", err);
         }
+    });
 
-        const textoTraducido = await traducirTexto(
-            datos.text,
-            "auto",
-            infoDestino.lang
-        );
+    ws.on("close", () => manejarDesconexion(ws));
+});
 
-        enviarACliente(cliente, {
+/* ── MANEJADORES ────────────────────────────────────────────────────────── */
+
+// Registro inicial: guarda nickname/idioma, envía historial y listas
+async function manejarRegistro(ws, cliente, datos) {
+    cliente.nickname = datos.nickname;
+    cliente.lang     = datos.lang || "es";
+
+    // Envía historial público al nuevo cliente
+    enviar(ws, { type: "history", history: historialPublico });
+
+    // Envía lista de canales existentes para que pueda unirse
+    const lista = Array.from(canales.values()).map(c => ({
+        id: c.id, nombre: c.nombre, creadorId: c.creadorId,
+    }));
+    enviar(ws, { type: "channel-list", channels: lista });
+
+    broadcast({ type: "system", text: `${cliente.nickname} se ha unido al chat.` });
+    emitirListaUsuarios();
+}
+
+// Mensaje público: se traduce al idioma de cada receptor
+async function manejarPublico(clienteOrigen, datos) {
+    const hora = horaActual();
+    guardarEnHistorial(historialPublico, {
+        type: "public", from: clienteOrigen.nickname, text: datos.text, time: hora,
+    });
+
+    // Traduce el texto individualmente para cada cliente conectado
+    wss.clients.forEach(async ws => {
+        const dest = clientes.get(ws);
+        const texto = await traducir(datos.text, "auto", dest.lang);
+        enviar(ws, { type: "public", from: clienteOrigen.nickname, text: texto, time: hora });
+    });
+}
+
+// Mensaje privado: solo llega al remitente y al destinatario
+async function manejarPrivado(clienteOrigen, datos) {
+    const hora = horaActual();
+
+    wss.clients.forEach(async ws => {
+        const dest = clientes.get(ws);
+        const esParte = dest.id === datos.to || dest.id === clienteOrigen.id;
+        if (!esParte) return;
+
+        const texto = await traducir(datos.text, "auto", dest.lang);
+        enviar(ws, {
             type: "private",
-            from: clienteActual.nickname,
-            fromId: clienteActual.id,
-            text: textoTraducido,
-            time: hora
+            from: clienteOrigen.nickname,
+            fromId: clienteOrigen.id,
+            text: texto,
+            time: hora,
         });
     });
 }
 
-function manejarEscribiendo(websocketActual, clienteActual, datos) {
-    servidorWebSocket.clients.forEach(cliente => {
-        const esOtroCliente = cliente !== websocketActual;
+// Indicador de "está escribiendo…": se reenvía a los demás
+function manejarTyping(wsOrigen, clienteOrigen, datos) {
+    wss.clients.forEach(ws => {
+        if (ws !== wsOrigen)
+            enviar(ws, { type: "typing", from: clienteOrigen.nickname, isTyping: datos.isTyping });
+    });
+}
 
-        if (!esOtroCliente) {
-            return;
-        }
+// Crear canal: el cliente queda registrado como creador
+function manejarCrearCanal(ws, cliente, datos) {
+    const id = generarId();
+    canales.set(id, {
+        id,
+        nombre:    datos.nombre.trim(),
+        creadorId: cliente.id,   // solo este usuario puede escribir
+        historial: [],
+    });
 
-        enviarACliente(cliente, {
-            type: "typing",
-            from: clienteActual.nickname,
-            isTyping: datos.isTyping
+    console.log(`Canal "${datos.nombre}" creado por ${cliente.nickname}`);
+    emitirListaCanales();
+}
+
+// Mensaje de canal: solo el creador puede enviarlo; se traduce para cada receptor
+async function manejarMensajeCanal(clienteOrigen, datos) {
+    const canal = canales.get(datos.canalId);
+    if (!canal) return;
+
+    // Verificación de permiso: bloquea si no es el creador
+    if (canal.creadorId !== clienteOrigen.id) return;
+
+    const hora = horaActual();
+    guardarEnHistorial(canal.historial, {
+        type: "channel-msg", canalId: canal.id,
+        from: clienteOrigen.nickname, text: datos.text, time: hora,
+    });
+
+    // Transmite a todos con traducción personalizada
+    wss.clients.forEach(async ws => {
+        const dest  = clientes.get(ws);
+        const texto = await traducir(datos.text, "auto", dest.lang);
+        enviar(ws, {
+            type: "channel-msg", canalId: canal.id,
+            from: clienteOrigen.nickname, text: texto, time: hora,
         });
     });
 }
 
-function manejarDesconexion(websocket) {
-    const cliente = clientes.get(websocket);
+// Desconexión: limpia el cliente y notifica a los demás
+function manejarDesconexion(ws) {
+    const cliente = clientes.get(ws);
+    if (!cliente) return;
 
-    if (!cliente) {
-        return;
-    }
-
-    enviarMensajeSistema(
-        `${cliente.nickname} ha salido del chat.`
-    );
-
-    clientes.delete(websocket);
-
-    enviarListaUsuarios();
+    broadcast({ type: "system", text: `${cliente.nickname} ha salido del chat.` });
+    clientes.delete(ws);
+    emitirListaUsuarios();
 }
 
-/* =========================
-   UTILIDADES
-========================= */
+/* ── UTILIDADES ─────────────────────────────────────────────────────────── */
 
-function obtenerHoraActual() {
-    return new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-    });
+function horaActual() {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-/* =========================
-   INICIAR SERVIDOR
-========================= */
+/* ── ARRANQUE ───────────────────────────────────────────────────────────── */
 
 servidor.listen(PUERTO, HOST, () => {
-    console.log(
-        `Servidor escuchando en red local en el puerto ${PUERTO}`
-    );
+    console.log(`Servidor escuchando en http://${HOST}:${PUERTO}`);
 });

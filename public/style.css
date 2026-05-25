@@ -35,6 +35,7 @@ h1, h2, h3 {
     border-radius: 12px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
     overflow: hidden;
+    position: relative;
 }
 
 /* ─── BARRA LATERAL (MULTIFUNCIÓN) ─────────────────────────────────────── */
@@ -45,10 +46,9 @@ h1, h2, h3 {
     display: flex;
     flex-direction: column;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
-    overflow-y: auto; /* Permite scroll general si hay muchos canales y usuarios */
+    overflow-y: auto;
 }
 
-/* Contenedores de secciones internas */
 .seccion-canales, .seccion-usuarios {
     display: flex;
     flex-direction: column;
@@ -69,7 +69,6 @@ h1, h2, h3 {
     margin: 0;
 }
 
-/* Formato estilizado de ítems de las listas (Canales y Usuarios) */
 .barra-lateral li {
     display: flex;
     align-items: center;
@@ -93,7 +92,6 @@ h1, h2, h3 {
     transform: translateY(0);
 }
 
-/* Notificación de globos flotantes de no leídos */
 .badge-usuario {
     background: #e74c3c !important;
     color: white !important;
@@ -105,7 +103,6 @@ h1, h2, h3 {
     margin-left: auto;
 }
 
-/* Estilo para el botón de crear canal en la barra lateral */
 #btn-crear-canal {
     padding: 10px;
     background: var(--accent);
@@ -115,10 +112,64 @@ h1, h2, h3 {
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
+    margin-bottom: 5px;
 }
 
 #btn-crear-canal:hover {
     background: #16a085;
+}
+
+/* ─── NUEVO: CONTENEDOR INTEGRADO CREAR CANAL ────────────────────────── */
+#contenedor-crear-canal {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
+    margin: 10px 0;
+}
+
+#input-nombre-canal {
+    width: 100%;
+    padding: 8px;
+    background: white;
+    color: #333;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#input-nombre-canal:focus {
+    border-color: var(--accent);
+}
+
+#btn-confirmar-crear, #btn-cancelar-crear {
+    padding: 6px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#btn-confirmar-crear {
+    background: var(--accent);
+    color: white;
+}
+
+#btn-confirmar-crear:hover {
+    background: #16a085;
+}
+
+#btn-cancelar-crear {
+    background: #e0e0e0;
+    color: #333;
+}
+
+#btn-cancelar-crear:hover {
+    background: #d5d5d5;
 }
 
 /* ─── ZONA DE CHAT PRINCIPAL ───────────────────────────────────────────── */
@@ -139,6 +190,8 @@ h1, h2, h3 {
     background: white;
     border-bottom: 1px solid #eaeaea;
     flex-shrink: 0;
+    height: 60px;
+    box-sizing: border-box;
 }
 
 .contenedor-titulo-chat {
@@ -180,7 +233,7 @@ h1, h2, h3 {
     gap: 12px;
 }
 
-/* ─── GLOBOS DE MENSAJE ESTILO WHATSAPP ────────────────────────────────── */
+/* ─── GLOBOS DE MENSAJE ────────────────────────────────────────────────── */
 .mensaje {
     max-width: 75%;
     padding: 8px 12px;
@@ -191,54 +244,48 @@ h1, h2, h3 {
     box-shadow: 0 1px 1px rgba(0,0,0,0.1);
     align-self: flex-start;
     background: white;
-    border-top-left-radius: 0; /* Pico del globo a la izquierda */
+    border-top-left-radius: 0;
     display: flex;
     flex-direction: column;
 }
 
-/* Nombre del remitente en la parte superior */
 .mensaje strong {
     display: block;
     font-size: 0.8rem;
-    color: #e53935; /* Color distintivo para nombres */
+    color: #e53935;
     margin-bottom: 2px;
 }
 
-/* El párrafo del contenido principal */
 .mensaje p {
     margin: 0;
-    padding-right: 25px; /* Espacio de seguridad para que el texto no tape la hora */
+    padding-right: 25px;
 }
 
-/* La hora abajo a la derecha */
 .mensaje span {
     display: block;
     font-size: 0.7rem;
-    color: #8696a0; /* Gris estilo WhatsApp */
-    align-self: flex-end; /* Lo empuja por completo a la derecha */
+    color: #8696a0;
+    align-self: flex-end;
     margin-top: 4px;
     margin-bottom: -2px;
     user-select: none;
 }
 
-/* ─── VARIACIÓN SI EL MENSAJE ES MÍO (LADO DERECHO) ────────────────────── */
 .mensaje.mio {
     align-self: flex-end;
-    background: #b3b1b1; 
+    background: #d9fdd3; /* Verde claro estilo chat moderno */
     border-top-left-radius: 8px;
-    border-top-right-radius: 0; /* Pico del globo a la derecha */
+    border-top-right-radius: 0;
 }
 
-/* Ocultar tu propio nombre en tus burbujas para limpiar la interfaz */
 .mensaje.mio strong {
     display: none;
 }
 
 .mensaje.mio span {
-    color: #667781; /* Tono de hora ligeramente diferente para burbuja verde */
+    color: #667781;
 }
 
-/* Indicador dinámico de escritura */
 #indicador-escribiendo {
     height: 20px;
     font-size: 0.8rem;
@@ -319,6 +366,7 @@ button:disabled, input:disabled {
     text-align: center;
     box-shadow: 0 10px 40px rgba(0,0,0,0.15);
     width: 320px;
+    box-sizing: border-box;
 }
 
 .modal-contenido h2 {
@@ -327,10 +375,21 @@ button:disabled, input:disabled {
     font-weight: 600;
 }
 
-.modal-contenido input {
+.modal-contenido label {
+    display: block;
+    text-align: left;
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.modal-contenido input, .modal-contenido select {
     width: 100%;
     box-sizing: border-box;
     margin-bottom: 15px;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
 }
 
 .modal-contenido button {
@@ -347,11 +406,7 @@ button:disabled, input:disabled {
     display: none !important;
 }
 
-.btn-menu-movil {
-    display: none;
-}
-
-/* ─── MEDIA QUERIES (SOPORTE DISPOSITIVOS MÓVILES) ───────────────────────── */
+/* ─── MEDIA QUERIES (SOPORTE RESPONSIVE COMPLETO) ───────────────────────── */
 @media (max-width: 768px) {
     body {
         align-items: stretch;
@@ -364,37 +419,36 @@ button:disabled, input:disabled {
         border-radius: 0;
     }
 
+    /* Menú móvil lateral deslizante */
     .barra-lateral {
         position: absolute;
         top: 60px;
-        left: -250px;
-        width: 210px;
+        left: -100%;
+        width: 260px;
         height: calc(100vh - 60px);
         z-index: 90;
-        transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 8px 0 20px rgba(0,0,0,0.15);
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 5px 0 15px rgba(0,0,0,0.1);
     }
 
+    /* Clase activa para tu botón de JS que despliega el menú móvil */
     .barra-lateral.activo {
         left: 0;
     }
 
-    .zona-chat {
-        height: 100vh;
-    }
-
-    .header-chat {
-        padding: 12px;
-    }
-
     .btn-menu-movil {
-        display: block !important;
-        background: var(--dark-bg);
-        color: white;
-        border: none;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
+        display: block;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        background: #f1f3f5;
+        color: #333;
+    }
+    
+    .btn-menu-movil:hover {
+        background: #e2e6ea;
+    }
+
+    .mensaje {
+        max-width: 85%;
     }
 }
