@@ -59,8 +59,47 @@
                 <div class="contenedor-titulo-chat">
                     <h1 id="chat-titulo">Sala Pública</h1>
                 </div>
-                <button id="btn-volver-publico" style="display:none;">Volver a Sala Pública</button>
+                <div class="header-acciones">
+                    <button id="btn-volver-publico" style="display:none;">Volver a Sala Pública</button>
+                    <button id="btn-fondo" title="Personalizar fondo" class="btn-icono-fondo">🎨</button>
+                </div>
             </header>
+
+            <!-- Panel de personalización de fondo -->
+            <div id="panel-fondo" class="panel-fondo oculto">
+                <div class="panel-fondo-cabecera">
+                    <span>Personalizar fondo</span>
+                    <button id="btn-cerrar-panel-fondo" class="btn-cerrar-panel">✕</button>
+                </div>
+                <div class="panel-fondo-opciones">
+                    <div class="opcion-fondo">
+                        <label>Color sólido</label>
+                        <input type="color" id="fondo-color" value="#f4f6f8">
+                    </div>
+                    <div class="opcion-fondo">
+                        <label>Degradado</label>
+                        <div class="degradado-controles">
+                            <input type="color" id="fondo-grad-1" value="#a8edea">
+                            <span>→</span>
+                            <input type="color" id="fondo-grad-2" value="#fed6e3">
+                        </div>
+                        <button id="btn-aplicar-degradado" class="btn-opcion-fondo">Aplicar degradado</button>
+                    </div>
+                    <div class="opcion-fondo">
+                        <label>Imagen (URL)</label>
+                        <input type="text" id="fondo-url" placeholder="https://...">
+                        <button id="btn-aplicar-url" class="btn-opcion-fondo">Aplicar imagen</button>
+                    </div>
+                    <div class="opcion-fondo">
+                        <label>Subir imagen</label>
+                        <label for="fondo-archivo" class="btn-opcion-fondo btn-subir">📁 Elegir archivo</label>
+                        <input type="file" id="fondo-archivo" accept="image/*" style="display:none;">
+                    </div>
+                    <div class="opcion-fondo">
+                        <button id="btn-restaurar-fondo" class="btn-restaurar">↺ Restaurar predeterminado</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Ventana de mensajes -->
             <div id="mensajes"></div>

@@ -507,7 +507,7 @@ function agregarMensaje(from, text, time) {
     const div = document.createElement("div");
     div.classList.add("mensaje");
     if (from === miNickname) div.classList.add("mio");
-    div.innerHTML = `<strong>${from}</strong> <span>${time}</span><p>${text}</p>`;
+    div.innerHTML = `<strong>${from}</strong> <p>${text}</p> <span>${time}</span>`;
     mensajes.appendChild(div);
     mensajes.scrollTop = mensajes.scrollHeight;
 }
@@ -524,3 +524,132 @@ function agregarSistema(text) {
 /* ── MENÚ MÓVIL ─────────────────────────────────────────────────────────── */
 
 btnMenu.addEventListener("click", () => barraLateral.classList.toggle("activo"));
+
+/* ── PERSONALIZACIÓN DE FONDO ──────────────────────────────────────────── */
+
+const btnFondo           = $("btn-fondo");
+const panelFondo         = $("panel-fondo");
+const btnCerrarPanelFondo = $("btn-cerrar-panel-fondo");
+const fondoColor         = $("fondo-color");
+const fondoGrad1         = $("fondo-grad-1");
+const fondoGrad2         = $("fondo-grad-2");
+const btnAplicarDegradado = $("btn-aplicar-degradado");
+const fondoUrl           = $("fondo-url");
+const btnAplicarUrl      = $("btn-aplicar-url");
+const fondoArchivo       = $("fondo-archivo");
+const btnRestaurarFondo  = $("btn-restaurar-fondo");
+const cajaMensajes       = $("mensajes");
+
+const FONDO_KEY = "chat_fondo_config";
+const FONDO_DEFAULT = { tipo: "color", valor: "#f4f6f8" };
+
+// Aplica la configuración de fondo al contenedor de mensajes
+function aplicarFondo(config) {
+    cajaMensajes.style.backgroundImage = "";
+    cajaMensajes.style.backgroundSize  = "";
+    cajaMensajes.style.backgroundPosition = "";
+    cajaMensajes.style.backgroundRepeat = "";
+
+    if (config.tipo === "color") {
+        cajaMensajes.style.background = config.valor;
+    } else if (config.tipo === "degradado") {
+        cajaMensajes.style.background = `linear-gradient(135deg, ${config.valor}, ${config.valor2})`;
+    } else if (config.tipo === "imagen") {
+        cajaMensajes.style.background = "#f4f6f8";
+        cajaMensajes.style.backgroundImage = `url("${config.valor}")`;
+        cajaMensajes.style.backgroundSize = "cover";
+        cajaMensajes.style.backgroundPosition = "center";
+        cajaMensajes.style.backgroundRepeat = "no-repeat";
+    }
+}
+
+// Guarda y aplica una configuración
+function guardarYAplicarFondo(config) {
+    try {
+        // Las imágenes en base64 pueden ser muy grandes para localStorage;
+        // se guardan igual pero solo si el navegador lo permite.
+        localStorage.setItem(FONDO_KEY, JSON.stringify(config));
+    } catch (_) { /* cuota superada — se aplica sin guardar */ }
+    aplicarFondo(config);
+}
+
+// Carga el fondo guardado al iniciar
+function cargarFondoGuardado() {
+    try {
+        const raw = localStorage.getItem(FONDO_KEY);
+        const config = raw ? JSON.parse(raw) : FONDO_DEFAULT;
+        aplicarFondo(config);
+        // Sincronizar los controles visuales
+        if (config.tipo === "color")     fondoColor.value  = config.valor;
+        if (config.tipo === "degradado") { fondoGrad1.value = config.valor; fondoGrad2.value = config.valor2; }
+    } catch (_) {
+        aplicarFondo(FONDO_DEFAULT);
+    }
+}
+
+// Abrir/cerrar panel
+btnFondo.addEventListener("click", (e) => {
+    e.stopPropagation();
+    panelFondo.classList.toggle("oculto");
+});
+
+btnCerrarPanelFondo.addEventListener("click", () => {
+    panelFondo.classList.add("oculto");
+});
+
+// Cerrar al hacer clic fuera
+document.addEventListener("click", (e) => {
+    if (!panelFondo.contains(e.target) && e.target !== btnFondo) {
+        panelFondo.classList.add("oculto");
+    }
+});
+
+// Color sólido — aplica en tiempo real mientras el usuario arrastra el picker
+fondoColor.addEventListener("input", () => {
+    guardarYAplicarFondo({ tipo: "color", valor: fondoColor.value });
+});
+
+// Degradado
+btnAplicarDegradado.addEventListener("click", () => {
+    guardarYAplicarFondo({ tipo: "degradado", valor: fondoGrad1.value, valor2: fondoGrad2.value });
+});
+
+// También actualiza el preview del degradado en tiempo real
+fondoGrad1.addEventListener("input", () => {
+    cajaMensajes.style.background = `linear-gradient(135deg, ${fondoGrad1.value}, ${fondoGrad2.value})`;
+});
+fondoGrad2.addEventListener("input", () => {
+    cajaMensajes.style.background = `linear-gradient(135deg, ${fondoGrad1.value}, ${fondoGrad2.value})`;
+});
+
+// URL de imagen
+btnAplicarUrl.addEventListener("click", () => {
+    const url = fondoUrl.value.trim();
+    if (!url) return;
+    guardarYAplicarFondo({ tipo: "imagen", valor: url });
+});
+
+fondoUrl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btnAplicarUrl.click();
+});
+
+// Subir imagen local — convierte a base64
+fondoArchivo.addEventListener("change", () => {
+    const file = fondoArchivo.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        guardarYAplicarFondo({ tipo: "imagen", valor: e.target.result });
+    };
+    reader.readAsDataURL(file);
+});
+
+// Restaurar fondo predeterminado
+btnRestaurarFondo.addEventListener("click", () => {
+    fondoColor.value = FONDO_DEFAULT.valor;
+    localStorage.removeItem(FONDO_KEY);
+    aplicarFondo(FONDO_DEFAULT);
+});
+
+// Inicializar al cargar la página
+cargarFondoGuardado();
