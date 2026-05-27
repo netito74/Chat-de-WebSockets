@@ -26,6 +26,7 @@ const texto             = $("texto");
 const btnEnviar         = $("btnEnviar");
 const listaUsuarios     = $("lista-usuarios");
 const listaCanales      = $("lista-canales");
+const listaMiembros = $("lista-miembros");
 const chatTitulo        = $("chat-titulo");
 const btnVolverPublico  = $("btn-volver-publico");
 const indicadorTyping   = $("indicador-escribiendo");
@@ -43,7 +44,7 @@ let miIdioma   = "es";
 
 // Vista activa: "publico" | "privado:<userId>" | "canal:<canalId>"
 let vistaActual = "publico";
-
+let usuariosConectados = [];
 // Historiales en memoria para cambiar de vista sin perder mensajes
 const historiales = {
     publico: [],      // array de mensajes
@@ -291,21 +292,39 @@ function recibirTyping(msg) {
 
 // Actualiza el mapa local de canales y redibuja la lista en la barra lateral
 function renderizarCanales(channels) {
+
     canalesInfo.clear();
-    channels.forEach(c => canalesInfo.set(c.id, c));
 
     listaCanales.innerHTML = "";
+
     channels.forEach(c => {
+
+        // SOLO SI PERTENECE AL GRUPO
+        if (!c.miembros.includes(miId)) return;
+
+        canalesInfo.set(c.id, c);
+
         const li = document.createElement("li");
+
         li.dataset.id = c.id;
 
         const esMiCanal = c.creadorId === miId;
-        const badge     = noLeidos[`canal:${c.id}`] || 0;
-        const badgeHtml = badge > 0 ? `<span class="badge-usuario">${badge}</span>` : "";
 
-        // Icono de corona para el creador, antena para los demás
-        li.innerHTML = `${esMiCanal ? "(D)" : "(C)"} ${c.nombre} ${badgeHtml}`;
+        const badge = noLeidos[`canal:${c.id}`] || 0;
+
+        const badgeHtml =
+            badge > 0
+                ? `<span class="badge-usuario">${badge}</span>`
+                : "";
+
+        li.innerHTML = `
+            ${esMiCanal ? "(👑)" : "(👥)"}
+            ${c.nombre}
+            ${badgeHtml}
+        `;
+
         li.addEventListener("click", () => abrirCanal(c.id));
+
         listaCanales.appendChild(li);
     });
 }
@@ -340,17 +359,25 @@ async function actualizarInputCanal() {
     const canalId = vistaActual.split(":")[1];
     const canal   = canalesInfo.get(canalId);
     const esMio   = canal && canal.creadorId === miId;
+    const soyMiembro = canal && canal.miembros.includes(miId);
 
-    texto.disabled    = !esMio;
-    btnEnviar.disabled = !esMio;
-    texto.placeholder = esMio
+    texto.disabled = !soyMiembro;
+    btnEnviar.disabled = !soyMiembro;
+
+    texto.placeholder = soyMiembro
         ? await t("escribe-mensaje")
         : await t("solo-lectura");
 }
 
 // Mostrar el input al hacer clic
-btnCrearCanal.addEventListener("click", () => { contenedorCrearCanal.style.display = "block"; inputNombreCanal.focus(); });
+btnCrearCanal.addEventListener("click", () => {
 
+    contenedorCrearCanal.style.display = "block";
+    inputNombreCanal.focus();
+
+    // fuerza actualización SIEMPRE
+    renderizarSeleccionUsuarios(usuariosConectados);
+});
 // Función única para cerrar y limpiar
 const cerrarCanal = () => { inputNombreCanal.value = ""; contenedorCrearCanal.style.display = "none"; };
 
@@ -359,9 +386,21 @@ btnCancelarCrear.addEventListener("click", cerrarCanal);
 
 // Confirmar y enviar
 btnConfirmarCrear.addEventListener("click", () => {
+
     const nombre = inputNombreCanal.value.trim();
+
     if (!nombre) return;
-    socket.send(JSON.stringify({ type: "channel-create", nombre }));
+
+    const miembros = [
+        ...listaMiembros.querySelectorAll("input:checked")
+    ].map(input => input.value);
+
+    socket.send(JSON.stringify({
+        type: "channel-create",
+        nombre,
+        miembros
+    }));
+
     cerrarCanal();
 });
 
@@ -370,26 +409,67 @@ btnConfirmarCrear.addEventListener("click", () => {
 
 // Renderiza la lista lateral de usuarios conectados (sin mostrarse a sí mismo)
 function renderizarUsuarios(users) {
-    // Detecta el propio ID al recibirlo la primera vez
+
+    // 1. Detectar ID primero (ANTES de todo)
     if (!miId) {
         const yo = users.find(u => u.nickname === miNickname);
         if (yo) miId = yo.id;
     }
 
+    usuariosConectados = users;
+
+    // 2. Ahora sí renderiza todo
+    renderizarSeleccionUsuarios(users);
+
     listaUsuarios.innerHTML = "";
+
     users.forEach(u => {
         if (u.nickname === miNickname) return;
 
-        const li    = document.createElement("li");
+        const li = document.createElement("li");
         li.dataset.id = u.id;
+
         const badge = noLeidos[`privado:${u.id}`] || 0;
-        const badgeHtml = badge > 0 ? `<span class="badge-usuario">${badge}</span>` : "";
+        const badgeHtml = badge > 0
+            ? `<span class="badge-usuario">${badge}</span>`
+            : "";
 
         li.innerHTML = `${u.nickname} ${badgeHtml}`;
         li.addEventListener("click", () => abrirPrivado(u));
+
         listaUsuarios.appendChild(li);
     });
 }
+
+function renderizarSeleccionUsuarios(users) {
+
+    const listaMiembros = $("lista-miembros");
+    if (!listaMiembros) return;
+
+    listaMiembros.innerHTML = "";
+
+    users.forEach(u => {
+
+        // esperar a tener miId
+        if (!miId) return;
+
+        if (u.id === miId) return;
+
+        const div = document.createElement("div");
+
+        div.className = "miembro-item";
+
+        div.innerHTML = `
+            <label>
+                <input type="checkbox" value="${u.id}">
+                ${u.nickname}
+            </label>
+        `;
+
+        listaMiembros.appendChild(div);
+    });
+}
+
 
 // Cambia la vista al chat privado con el usuario indicado
 function abrirPrivado(usuario) {

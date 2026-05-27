@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat WebSocket</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
     <!-- Modal de registro: nickname + idioma -->
@@ -35,14 +37,35 @@
             <div class="seccion-canales">
                 <h3 id="titulo-canales">Canales</h3>
                 <button id="btn-crear-canal">＋ Crear Canal</button>
-                
+
                 <!-- NUEVO: Formulario oculto para ingresar el nombre -->
                 <div id="contenedor-crear-canal" style="display: none; margin: 10px 0;">
-                    <input type="text" id="input-nombre-canal" style="width: 100%; margin-bottom: 5px;">
-                    <div style="display: flex; gap: 5px;">
-                        <button id="btn-confirmar-crear" style="flex: 1;">OK</button>
-                        <button id="btn-cancelar-crear" style="flex: 1;">X</button>
+
+                    <input type="text" id="input-nombre-canal" placeholder="Nombre del grupo"
+                        style="width: 100%; margin-bottom: 10px;">
+
+                    <!-- LISTA DE MIEMBROS -->
+                    <div id="lista-miembros" style="
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background: #fff;
+        ">
                     </div>
+
+                    <div style="display: flex; gap: 5px;">
+                        <button id="btn-confirmar-crear" style="flex: 1;">
+                            Crear
+                        </button>
+
+                        <button id="btn-cancelar-crear" style="flex: 1;">
+                            Cancelar
+                        </button>
+                    </div>
+
                 </div>
 
                 <ul id="lista-canales"></ul>
@@ -116,4 +139,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

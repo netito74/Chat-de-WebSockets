@@ -23,7 +23,9 @@ const TIPOS_CONTENIDO = {
 const clientes = new Map();
 
 // Map<canalId, { id, nombre, creadorId, historial: [] }>
+// Map<canalId, { id, nombre, creadorId, miembros: [], historial: [] }>
 const canales = new Map();
+
 
 // Historial de la sala pública (últimos N mensajes)
 const historialPublico = [];
@@ -142,10 +144,18 @@ function emitirListaUsuarios() {
 
 // Envía la lista completa de canales a todos
 function emitirListaCanales() {
+
     const lista = Array.from(canales.values()).map(c => ({
-        id: c.id, nombre: c.nombre, creadorId: c.creadorId,
+        id: c.id,
+        nombre: c.nombre,
+        creadorId: c.creadorId,
+        miembros: c.miembros
     }));
-    broadcast({ type: "channel-list", channels: lista });
+
+    broadcast({
+        type: "channel-list",
+        channels: lista
+    });
 }
 
 // Guarda mensaje en el historial y descarta el más antiguo si excede el límite
@@ -196,7 +206,10 @@ async function manejarRegistro(ws, cliente, datos) {
 
     // Envía lista de canales existentes para que pueda unirse
     const lista = Array.from(canales.values()).map(c => ({
-        id: c.id, nombre: c.nombre, creadorId: c.creadorId,
+        id: c.id,
+        nombre: c.nombre,
+        creadorId: c.creadorId,
+        miembros: c.miembros
     }));
     enviar(ws, { type: "channel-list", channels: lista });
 
@@ -249,15 +262,24 @@ function manejarTyping(wsOrigen, clienteOrigen, datos) {
 
 // Crear canal: el cliente queda registrado como creador
 function manejarCrearCanal(ws, cliente, datos) {
+
     const id = generarId();
+
+    const miembros = [
+        cliente.id,
+        ...(datos.miembros || [])
+    ];
+
     canales.set(id, {
         id,
-        nombre:    datos.nombre.trim(),
-        creadorId: cliente.id,   // solo este usuario puede escribir
+        nombre: datos.nombre.trim(),
+        creadorId: cliente.id,
+        miembros,
         historial: [],
     });
 
     console.log(`Canal "${datos.nombre}" creado por ${cliente.nickname}`);
+
     emitirListaCanales();
 }
 
@@ -266,8 +288,6 @@ async function manejarMensajeCanal(clienteOrigen, datos) {
     const canal = canales.get(datos.canalId);
     if (!canal) return;
 
-    // Verificación de permiso: bloquea si no es el creador
-    if (canal.creadorId !== clienteOrigen.id) return;
 
     const hora = horaActual();
     guardarEnHistorial(canal.historial, {
@@ -278,6 +298,8 @@ async function manejarMensajeCanal(clienteOrigen, datos) {
     // Transmite a todos con traducción personalizada
     wss.clients.forEach(async ws => {
         const dest  = clientes.get(ws);
+        if (!canal.miembros.includes(dest.id)) return;
+
         const texto = await traducir(datos.text, "auto", dest.lang);
         enviar(ws, {
             type: "channel-msg", canalId: canal.id,
