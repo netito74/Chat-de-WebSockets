@@ -443,26 +443,23 @@ function renderizarUsuarios(users) {
 
 function renderizarSeleccionUsuarios(users) {
 
-    const listaMiembros = $("lista-miembros");
     if (!listaMiembros) return;
 
     listaMiembros.innerHTML = "";
 
     users.forEach(u => {
 
-        // esperar a tener miId
-        if (!miId) return;
-
-        if (u.id === miId) return;
+        // no mostrarme a mí mismo
+        if (u.nickname === miNickname) return;
 
         const div = document.createElement("div");
 
         div.className = "miembro-item";
 
         div.innerHTML = `
-            <label>
+            <label class="miembro-label">
                 <input type="checkbox" value="${u.id}">
-                ${u.nickname}
+                <span>${u.nickname}</span>
             </label>
         `;
 
