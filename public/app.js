@@ -156,6 +156,9 @@ btnEntrar.addEventListener("click", async () => {
     btnEnviar.disabled       = false;
 
     socket.send(JSON.stringify({ type: "register", nickname: miNickname, lang: miIdioma }));
+
+    // Cargar el fondo personalizado de este usuario (ahora que miNickname está disponible)
+    cargarFondoGuardado();
 });
 
 /* ── RECEPCIÓN DE MENSAJES WS ───────────────────────────────────────────── */
@@ -163,15 +166,15 @@ socket.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
 
     const handlers = {
-        // CORRECCIÓN: Ahora el historial también espera su traducción
-        history:       async () => await recibirHistorial(msg),
-        system:        () => recibirSistema(msg),
-        "user-list":   () => renderizarUsuarios(msg.users),
-        "channel-list":() => renderizarCanales(msg.channels),
-        public:        async () => await recibirPublico(msg),
-        private:       async () => await recibirPrivado(msg), 
-        "channel-msg": async () => await recibirMensajeCanal(msg), 
-        typing:        () => recibirTyping(msg),
+        history:          async () => await recibirHistorial(msg),
+        system:           () => recibirSistema(msg),
+        "user-list":      () => renderizarUsuarios(msg.users),
+        "channel-list":   () => renderizarCanales(msg.channels),
+        "channel-deleted":() => recibirCanalEliminado(msg),
+        public:           async () => await recibirPublico(msg),
+        private:          async () => await recibirPrivado(msg),
+        "channel-msg":    async () => await recibirMensajeCanal(msg),
+        typing:           () => recibirTyping(msg),
     };
 
     if (handlers[msg.type]) await handlers[msg.type](); 
@@ -258,6 +261,22 @@ async function recibirMensajeCanal(msg) {
 
 
 
+// Canal eliminado por su creador: limpia estado local y redirige si es necesario
+async function recibirCanalEliminado({ canalId, nombre }) {
+    const key = `canal:${canalId}`;
+
+    // Si el usuario estaba dentro del canal eliminado → redirigir
+    if (vistaActual === key) {
+        await irASalaPublica();
+        mostrarToast(`El canal «${nombre}» fue eliminado`, "warn", 5000);
+    }
+
+    // Limpiar estado local independientemente de dónde estuviera el usuario
+    canalesInfo.delete(canalId);
+    delete historiales[key];
+    delete noLeidos[key];
+}
+
 // Traduce un mensaje dinámico en tiempo real usando tu API existente
 async function traducirTextoDinamico(texto, idiomaDestino) {
     if (idiomaDestino === "es") return texto; // Si el destino es español, se queda igual (o el idioma base)
@@ -327,6 +346,12 @@ function renderizarCanales(channels) {
 
         listaCanales.appendChild(li);
     });
+
+    // Si estamos viendo un canal, actualizar botón y panel de miembros
+    actualizarBotonGestionar();
+    if (!panelMiembros.classList.contains("oculto")) {
+        renderizarPanelMiembros();
+    }
 }
 
 // Cambia la vista al canal indicado y carga su historial
@@ -348,6 +373,7 @@ function abrirCanal(canalId) {
     actualizarBadgeCanal(canalId);
 
     actualizarInputCanal();
+    actualizarBotonGestionar();
     barraLateral.classList.remove("activo");
     texto.focus();
 }
@@ -520,16 +546,7 @@ function actualizarBadgeEnLi(li, count) {
 /* ── VOLVER A SALA PÚBLICA ──────────────────────────────────────────────── */
 
 btnVolverPublico.addEventListener("click", async () => {
-    vistaActual = "publico";
-    chatTitulo.textContent         = await t("sala-publica");
-    btnVolverPublico.style.display = "none";
-    mensajes.innerHTML             = "";
-    indicadorTyping.textContent    = "";
-    texto.disabled                 = false;
-    btnEnviar.disabled             = false;
-    texto.placeholder              = await t("escribe-mensaje");
-
-    historiales.publico.forEach(msg => agregarMensaje(msg.from, msg.text, msg.time));
+    await irASalaPublica();
     texto.focus();
 });
 
@@ -617,7 +634,7 @@ const fondoArchivo       = $("fondo-archivo");
 const btnRestaurarFondo  = $("btn-restaurar-fondo");
 const cajaMensajes       = $("mensajes");
 
-const FONDO_KEY = "chat_fondo_config";
+const fondoKeyUsuario = () => `chat_fondo_config_${miNickname || "default"}`;
 const FONDO_DEFAULT = { tipo: "color", valor: "#f4f6f8" };
 
 // Aplica la configuración de fondo al contenedor de mensajes
@@ -643,20 +660,17 @@ function aplicarFondo(config) {
 // Guarda y aplica una configuración
 function guardarYAplicarFondo(config) {
     try {
-        // Las imágenes en base64 pueden ser muy grandes para localStorage;
-        // se guardan igual pero solo si el navegador lo permite.
-        localStorage.setItem(FONDO_KEY, JSON.stringify(config));
+        localStorage.setItem(fondoKeyUsuario(), JSON.stringify(config));
     } catch (_) { /* cuota superada — se aplica sin guardar */ }
     aplicarFondo(config);
 }
 
-// Carga el fondo guardado al iniciar
+// Carga el fondo guardado — llamar DESPUÉS de que miNickname esté seteado
 function cargarFondoGuardado() {
     try {
-        const raw = localStorage.getItem(FONDO_KEY);
+        const raw = localStorage.getItem(fondoKeyUsuario());
         const config = raw ? JSON.parse(raw) : FONDO_DEFAULT;
         aplicarFondo(config);
-        // Sincronizar los controles visuales
         if (config.tipo === "color")     fondoColor.value  = config.valor;
         if (config.tipo === "degradado") { fondoGrad1.value = config.valor; fondoGrad2.value = config.valor2; }
     } catch (_) {
@@ -664,22 +678,9 @@ function cargarFondoGuardado() {
     }
 }
 
-// Abrir/cerrar panel
-btnFondo.addEventListener("click", (e) => {
-    e.stopPropagation();
-    panelFondo.classList.toggle("oculto");
-});
-
-btnCerrarPanelFondo.addEventListener("click", () => {
-    panelFondo.classList.add("oculto");
-});
-
-// Cerrar al hacer clic fuera
-document.addEventListener("click", (e) => {
-    if (!panelFondo.contains(e.target) && e.target !== btnFondo) {
-        panelFondo.classList.add("oculto");
-    }
-});
+// Delegado al PanelManager (definido al final del archivo)
+btnFondo.addEventListener("click", (e) => { e.stopPropagation(); PanelManager.toggle("fondo"); });
+btnCerrarPanelFondo.addEventListener("click", () => PanelManager.cerrar("fondo"));
 
 // Color sólido — aplica en tiempo real mientras el usuario arrastra el picker
 fondoColor.addEventListener("input", () => {
@@ -724,9 +725,404 @@ fondoArchivo.addEventListener("change", () => {
 // Restaurar fondo predeterminado
 btnRestaurarFondo.addEventListener("click", () => {
     fondoColor.value = FONDO_DEFAULT.valor;
-    localStorage.removeItem(FONDO_KEY);
+    localStorage.removeItem(fondoKeyUsuario());
     aplicarFondo(FONDO_DEFAULT);
 });
 
-// Inicializar al cargar la página
-cargarFondoGuardado();
+// NO se llama cargarFondoGuardado() aquí — se llama tras el login para usar el nick correcto
+
+/* ── GESTIÓN DE MIEMBROS (solo creador del canal) ─────────────────────── */
+
+const btnGestionarMiembros    = $("btn-gestionar-miembros");
+const panelMiembros           = $("panel-miembros");
+const btnCerrarPanelMiembros  = $("btn-cerrar-panel-miembros");
+const listaAddMiembros        = $("lista-add-miembros");
+const listaMiembrosActuales   = $("lista-miembros-actuales");
+
+// Muestra u oculta el botón de gestión según si somos creadores del canal activo
+function actualizarBotonGestionar() {
+    if (!vistaActual.startsWith("canal:")) {
+        btnGestionarMiembros.style.display = "none";
+        return;
+    }
+    const canalId = vistaActual.split(":")[1];
+    const canal   = canalesInfo.get(canalId);
+    btnGestionarMiembros.style.display =
+        canal && canal.creadorId === miId ? "inline-flex" : "none";
+}
+
+// Renderiza el panel: usuarios a añadir y miembros actuales con botón de eliminar
+function renderizarPanelMiembros() {
+    if (!vistaActual.startsWith("canal:")) return;
+    const canalId = vistaActual.split(":")[1];
+    const canal   = canalesInfo.get(canalId);
+    if (!canal || canal.creadorId !== miId) return;
+
+    // — Sección "Añadir" (usuarios que NO son miembros aún)
+    listaAddMiembros.innerHTML = "";
+    const noMiembros = usuariosConectados.filter(
+        u => u.id !== miId && !canal.miembros.includes(u.id)
+    );
+    if (noMiembros.length === 0) {
+        listaAddMiembros.innerHTML = "<em style='opacity:.6;font-size:.85em'>Todos los usuarios ya son miembros</em>";
+    } else {
+        noMiembros.forEach(u => {
+            const div = document.createElement("div");
+            div.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:4px 0;";
+            div.innerHTML = `
+                <span>${u.nickname}</span>
+                <button data-uid="${u.id}" class="btn-add-miembro" style="background:#4caf50;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.8em;">＋ Añadir</button>
+            `;
+            listaAddMiembros.appendChild(div);
+        });
+        listaAddMiembros.querySelectorAll(".btn-add-miembro").forEach(btn => {
+            btn.addEventListener("click", () => {
+                socket.send(JSON.stringify({
+                    type: "channel-add-member",
+                    canalId,
+                    userId: btn.dataset.uid,
+                }));
+            });
+        });
+    }
+
+    // — Sección "Miembros actuales" (con botón de eliminar, excepto el creador)
+    listaMiembrosActuales.innerHTML = "";
+    canal.miembros.forEach(uid => {
+        const usuario = usuariosConectados.find(u => u.id === uid);
+        const nombre  = usuario ? usuario.nickname : (uid === miId ? miNickname + " (tú)" : `[${uid.slice(1,5)}...]`);
+        const esCreador = uid === canal.creadorId;
+
+        const div = document.createElement("div");
+        div.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:4px 0;";
+        div.innerHTML = `
+            <span>${nombre}${esCreador ? " 👑" : ""}</span>
+            ${!esCreador ? `<button data-uid="${uid}" class="btn-remove-miembro" style="background:#e53935;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.8em;">✕ Quitar</button>` : ""}
+        `;
+        listaMiembrosActuales.appendChild(div);
+    });
+    listaMiembrosActuales.querySelectorAll(".btn-remove-miembro").forEach(btn => {
+        btn.addEventListener("click", () => {
+            socket.send(JSON.stringify({
+                type: "channel-remove-member",
+                canalId,
+                userId: btn.dataset.uid,
+            }));
+        });
+    });
+
+    // — Zona de peligro: eliminar el canal completo —
+    const zonaEliminar = document.createElement("div");
+    zonaEliminar.style.cssText = "border-top:1px solid #fee2e2;margin-top:10px;padding-top:10px;";
+    zonaEliminar.innerHTML = `
+        <p style="font-size:.75rem;color:#9ca3af;margin-bottom:6px;">Zona de peligro</p>
+        <button id="btn-eliminar-canal"
+            style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:8px;
+                   padding:7px 0;cursor:pointer;font-size:.85rem;font-weight:600;
+                   display:flex;align-items:center;justify-content:center;gap:6px;">
+            🗑️ Eliminar canal
+        </button>
+    `;
+    listaMiembrosActuales.appendChild(zonaEliminar);
+
+    document.getElementById("btn-eliminar-canal").addEventListener("click", () => {
+        mostrarDialogoConfirmarEliminar(canal.nombre, canalId);
+    });
+}
+
+/**
+ * Muestra un diálogo de confirmación centrado en pantalla.
+ * Se monta sobre un overlay oscuro semi-transparente para máxima visibilidad.
+ * Se destruye al confirmar o cancelar — nunca usa alert().
+ */
+function mostrarDialogoConfirmarEliminar(nombreCanal, canalId) {
+    // Evitar duplicados
+    if (document.getElementById("dialogo-confirmar-eliminar")) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "dialogo-confirmar-eliminar";
+    overlay.style.cssText = `
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.55);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999;
+        animation: fadeInOverlay 150ms ease;
+    `;
+
+    overlay.innerHTML = `
+        <div style="
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px 24px 20px;
+            width: 320px;
+            max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUpDialog 180ms ease;
+            text-align: center;
+        ">
+            <div style="font-size: 2.2rem; margin-bottom: 12px;">🗑️</div>
+            <h3 style="margin:0 0 8px;font-size:1rem;color:#111827;">¿Eliminar canal?</h3>
+            <p style="font-size:.85rem;color:#6b7280;margin:0 0 20px;line-height:1.5;">
+                Vas a eliminar <strong>«${nombreCanal}»</strong> para todos sus miembros.<br>
+                Esta acción no se puede deshacer.
+            </p>
+            <div style="display:flex;gap:10px;">
+                <button id="dialogo-btn-no"
+                    style="flex:1;padding:10px 0;border:1.5px solid #e5e7eb;background:#fff;
+                           color:#374151;border-radius:10px;cursor:pointer;font-size:.9rem;font-weight:500;">
+                    Cancelar
+                </button>
+                <button id="dialogo-btn-si"
+                    style="flex:1;padding:10px 0;border:none;background:#dc2626;
+                           color:#fff;border-radius:10px;cursor:pointer;font-size:.9rem;font-weight:600;">
+                    Sí, eliminar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Añadir keyframes si no existen aún
+    if (!document.getElementById("dialogo-keyframes")) {
+        const style = document.createElement("style");
+        style.id = "dialogo-keyframes";
+        style.textContent = `
+            @keyframes fadeInOverlay { from { opacity:0 } to { opacity:1 } }
+            @keyframes slideUpDialog { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const cerrarDialogo = () => overlay.remove();
+
+    document.getElementById("dialogo-btn-no").addEventListener("click", cerrarDialogo);
+
+    // Clic en el overlay oscuro también cancela
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) cerrarDialogo(); });
+
+    // Escape también cancela
+    const onKeyDown = (e) => { if (e.key === "Escape") { cerrarDialogo(); document.removeEventListener("keydown", onKeyDown); } };
+    document.addEventListener("keydown", onKeyDown);
+
+    document.getElementById("dialogo-btn-si").addEventListener("click", () => {
+        socket.send(JSON.stringify({ type: "channel-delete", canalId }));
+        PanelManager.cerrar("miembros");
+        cerrarDialogo();
+    });
+}
+
+btnGestionarMiembros.addEventListener("click", (e) => {
+    e.stopPropagation();
+    renderizarPanelMiembros();
+    PanelManager.toggle("miembros");
+});
+
+btnCerrarPanelMiembros.addEventListener("click", () => PanelManager.cerrar("miembros"));
+
+/* ── PANEL MANAGER — control exclusivo de paneles flotantes ──────────────
+ *
+ *  Gestiona un único panel abierto a la vez (tipo acordeón exclusivo).
+ *  Registro: { id → { panel: HTMLElement, triggers: HTMLElement[] } }
+ *  Al abrir uno, cierra todos los demás antes de aplicar toggle.
+ *  Un listener global en document cierra cualquier panel abierto al hacer
+ *  clic fuera — reemplaza los tres document.addEventListener dispersos.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const PanelManager = (() => {
+    // Registro interno: id → { panel, triggers }
+    const _registro = {};
+
+    /** Registra un panel junto con los elementos que lo activan */
+    function registrar(id, panel, triggers = []) {
+        _registro[id] = { panel, triggers };
+    }
+
+    /** Devuelve true si el panel indicado está actualmente visible */
+    function estaAbierto(id) {
+        return _registro[id] && !_registro[id].panel.classList.contains("oculto");
+    }
+
+    /** Cierra un panel concreto */
+    function cerrar(id) {
+        if (_registro[id]) _registro[id].panel.classList.add("oculto");
+    }
+
+    /** Cierra todos los paneles registrados */
+    function cerrarTodos() {
+        Object.keys(_registro).forEach(cerrar);
+    }
+
+    /**
+     * Toggle exclusivo: si el panel objetivo estaba abierto lo cierra;
+     * si estaba cerrado, primero cierra todos los demás y luego lo abre.
+     */
+    function toggle(id) {
+        if (estaAbierto(id)) {
+            cerrar(id);
+        } else {
+            cerrarTodos();
+            if (_registro[id]) _registro[id].panel.classList.remove("oculto");
+        }
+    }
+
+    /**
+     * Listener global de cierre al clic fuera.
+     * Ignora el clic si el target está dentro de un panel registrado
+     * o es uno de sus triggers.
+     */
+    document.addEventListener("click", (e) => {
+        Object.entries(_registro).forEach(([id, { panel, triggers }]) => {
+            const dentroDePabel   = panel.contains(e.target);
+            const esUnTrigger     = triggers.some(t => t === e.target || t.contains(e.target));
+            if (!dentroDePabel && !esUnTrigger) cerrar(id);
+        });
+    });
+
+    return { registrar, toggle, cerrar, cerrarTodos, estaAbierto };
+})();
+
+// — Registrar los dos paneles con sus botones de disparo —
+PanelManager.registrar("fondo",    panelFondo,    [btnFondo]);
+PanelManager.registrar("miembros", panelMiembros, [btnGestionarMiembros]);
+
+
+/* ── TOAST — notificaciones no intrusivas ────────────────────────────────
+ *
+ *  Inserta un elemento toast en #zona-chat con animación CSS.
+ *  Se autodestruye tras `duracion` ms.
+ *  Tipos: "info" | "warn" | "error"
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function mostrarToast(mensaje, tipo = "info", duracion = 4000) {
+    const COLORES = {
+        info:  { bg: "#1B2A4A", icon: "ℹ️" },
+        warn:  { bg: "#B45309", icon: "⚠️" },
+        error: { bg: "#B91C1C", icon: "🚫" },
+    };
+    const { bg, icon } = COLORES[tipo] ?? COLORES.info;
+
+    const toast = document.createElement("div");
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+
+    Object.assign(toast.style, {
+        position:     "absolute",
+        top:          "12px",
+        left:         "50%",
+        transform:    "translateX(-50%) translateY(-8px)",
+        background:   bg,
+        color:        "#fff",
+        padding:      "10px 18px",
+        borderRadius: "10px",
+        fontSize:     "0.85rem",
+        fontWeight:   "500",
+        boxShadow:    "0 4px 16px rgba(0,0,0,0.22)",
+        zIndex:       "200",
+        whiteSpace:   "nowrap",
+        opacity:      "0",
+        transition:   "opacity 220ms ease, transform 220ms ease",
+        pointerEvents:"none",
+    });
+
+    toast.textContent = `${icon}  ${mensaje}`;
+
+    // El contenedor relativo donde se ancla el toast
+    const contenedor = $("zona-chat") ?? document.body;
+    contenedor.appendChild(toast);
+
+    // Entrada (siguiente frame para que la transición se dispare)
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            toast.style.opacity   = "1";
+            toast.style.transform = "translateX(-50%) translateY(0)";
+        });
+    });
+
+    // Salida y limpieza
+    setTimeout(() => {
+        toast.style.opacity   = "0";
+        toast.style.transform = "translateX(-50%) translateY(-8px)";
+        toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+    }, duracion);
+}
+
+
+/* ── DETECCIÓN DE EXPULSIÓN Y REDIRECCIÓN AUTOMÁTICA ─────────────────────
+ *
+ *  Cada vez que el servidor emite "channel-list" se comprueba si el usuario
+ *  estaba activo en un canal que ya no aparece en su lista de membresía.
+ *  Si es así → se cierra limpiamente la vista del canal y se redirige a la
+ *  Sala Pública mostrando un toast de aviso, sin ningún alert() bloqueante.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Punto de integración: reemplaza el `renderizarCanales` original añadiendo
+ * la lógica de detección de expulsión antes del renderizado.
+ * Se llama cada vez que llega un "channel-list" desde el servidor.
+ */
+const _renderizarCanalesOriginal = renderizarCanales;
+
+// Sobrescribimos renderizarCanales para añadir la detección de expulsión
+// sin tocar el cuerpo de la función original.
+// eslint-disable-next-line no-global-assign
+renderizarCanales = function(channels) {
+    // ── Detección de expulsión ──────────────────────────────────────────
+    if (vistaActual.startsWith("canal:") && miId) {
+        const canalActivoId = vistaActual.split(":")[1];
+
+        // El usuario ha sido expulsado si el canal activo:
+        //   a) ya no existe en la nueva lista, O
+        //   b) existe pero el usuario ya no figura entre sus miembros
+        const siguePerteneciendo = channels.some(
+            c => c.id === canalActivoId && c.miembros.includes(miId)
+        );
+
+        if (!siguePerteneciendo) {
+            // Nombre del canal para el mensaje (tomado del estado local previo)
+            const nombreCanal = canalesInfo.get(canalActivoId)?.nombre ?? "ese canal";
+
+            // Redirigir a sala pública de forma limpia (misma lógica que el botón)
+            irASalaPublica();
+
+            // Notificación sutil, sin bloquear la UI
+            mostrarToast(`Ya no eres miembro de «${nombreCanal}»`, "warn", 5000);
+
+            // Limpiar historial local del canal para liberar memoria
+            delete historiales[`canal:${canalActivoId}`];
+            delete noLeidos[`canal:${canalActivoId}`];
+        }
+    }
+
+    // ── Delegación al renderizado original ─────────────────────────────
+    _renderizarCanalesOriginal(channels);
+};
+
+
+/* ── irASalaPublica — helper de navegación reutilizable ──────────────────
+ *
+ *  Centraliza toda la lógica de "volver a sala pública" en un único lugar.
+ *  Utilizado por el botón de volver, la detección de expulsión, y cualquier
+ *  otra ruta que necesite resetear la vista principal.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+async function irASalaPublica() {
+    vistaActual = "publico";
+
+    // Resetear UI del chat principal
+    chatTitulo.textContent         = await t("sala-publica");
+    btnVolverPublico.style.display = "none";
+    mensajes.innerHTML             = "";
+    indicadorTyping.textContent    = "";
+    texto.disabled                 = false;
+    btnEnviar.disabled             = false;
+    texto.placeholder              = await t("escribe-mensaje");
+    texto.value                    = "";
+
+    // Cerrar paneles flotantes y ocultar botón de gestión
+    PanelManager.cerrarTodos();
+    btnGestionarMiembros.style.display = "none";
+
+    // Recargar historial público
+    historiales.publico.forEach(msg => agregarMensaje(msg.from, msg.text, msg.time));
+}

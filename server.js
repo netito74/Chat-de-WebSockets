@@ -177,12 +177,15 @@ wss.on("connection", ws => {
 
             // Despacha cada tipo de mensaje a su manejador
             const handlers = {
-                register:        () => manejarRegistro(ws, cliente, datos),
-                public:          () => manejarPublico(cliente, datos),
-                private:         () => manejarPrivado(cliente, datos),
-                typing:          () => manejarTyping(ws, cliente, datos),
-                "channel-create": () => manejarCrearCanal(ws, cliente, datos),
-                "channel-msg":   () => manejarMensajeCanal(cliente, datos),
+                register:              () => manejarRegistro(ws, cliente, datos),
+                public:                () => manejarPublico(cliente, datos),
+                private:               () => manejarPrivado(cliente, datos),
+                typing:                () => manejarTyping(ws, cliente, datos),
+                "channel-create":      () => manejarCrearCanal(ws, cliente, datos),
+                "channel-msg":         () => manejarMensajeCanal(cliente, datos),
+                "channel-add-member":    () => manejarAgregarMiembro(cliente, datos),
+                "channel-remove-member": () => manejarEliminarMiembro(cliente, datos),
+                "channel-delete":        () => manejarEliminarCanal(cliente, datos),
             };
 
             if (handlers[datos.type]) await handlers[datos.type]();
@@ -306,6 +309,51 @@ async function manejarMensajeCanal(clienteOrigen, datos) {
             from: clienteOrigen.nickname, text: texto, time: hora,
         });
     });
+}
+
+// Agregar miembro: solo el creador puede hacerlo
+function manejarAgregarMiembro(cliente, datos) {
+    const canal = canales.get(datos.canalId);
+    if (!canal) return;
+    if (canal.creadorId !== cliente.id) return; // solo el creador
+
+    const nuevoId = datos.userId;
+    if (!nuevoId || canal.miembros.includes(nuevoId)) return;
+
+    canal.miembros.push(nuevoId);
+    console.log(`Miembro ${nuevoId} añadido al canal "${canal.nombre}" por ${cliente.nickname}`);
+    emitirListaCanales();
+}
+
+// Eliminar miembro: solo el creador puede hacerlo (no puede eliminarse a sí mismo)
+function manejarEliminarMiembro(cliente, datos) {
+    const canal = canales.get(datos.canalId);
+    if (!canal) return;
+    if (canal.creadorId !== cliente.id) return; // solo el creador
+    if (datos.userId === cliente.id) return;    // no puede autoeliminarse
+
+    canal.miembros = canal.miembros.filter(id => id !== datos.userId);
+    console.log(`Miembro ${datos.userId} eliminado del canal "${canal.nombre}" por ${cliente.nickname}`);
+    emitirListaCanales();
+}
+
+// Eliminar canal completo: solo el creador puede hacerlo
+function manejarEliminarCanal(cliente, datos) {
+    const canal = canales.get(datos.canalId);
+    if (!canal) return;
+    if (canal.creadorId !== cliente.id) return; // solo el creador
+
+    canales.delete(datos.canalId);
+    console.log(`Canal "${canal.nombre}" eliminado por ${cliente.nickname}`);
+
+    // Notifica a todos los miembros que el canal fue eliminado
+    broadcast({
+        type: "channel-deleted",
+        canalId: datos.canalId,
+        nombre:  canal.nombre,
+    });
+
+    emitirListaCanales();
 }
 
 // Desconexión: limpia el cliente y notifica a los demás
