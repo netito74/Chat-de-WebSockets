@@ -1,20 +1,94 @@
-# 💬 Proyecto Chat en Tiempo Real con WebSockets
+# 💬 Chat en Tiempo Real con WebSockets
 
 ## 📌 Descripción General
 
-Este proyecto consiste en una aplicación de chat en tiempo real desarrollada utilizando WebSockets, permitiendo la comunicación instantánea entre múltiples usuarios.  
+Aplicación de chat en tiempo real con WebSockets que permite comunicación instantánea entre múltiples usuarios, con sala pública, chats privados, canales de difusión, traducción automática y personalización visual.
 
-La aplicación incluye funcionalidades avanzadas como:
-
-- Chat en sala pública.
-- Chat privado entre usuarios.
-- Traductor en tiempo real.
-- Canales de difusión.
-- Personalización del fondo del chat con colores o imágenes.
+Esta versión conserva el 100% de las funcionalidades del proyecto original, pero reorganiza tanto el backend como el frontend en **capas con responsabilidades únicas**, en vez de dos archivos monolíticos (`server.js` y `app.js`). El objetivo: que añadir una funcionalidad nueva, o cambiar una existente (p. ej. cambiar de LibreTranslate a otro traductor), implique tocar uno o dos archivos pequeños y predecibles, no rastrear lógica mezclada en un archivo de mil líneas.
 
 ---
 
-# 👥 Integrantes del Equipo
+## 🏗️ Arquitectura
+
+### Backend (`src/`)
+
+```
+server.js                      ← punto de entrada: ensambla HTTP + WebSocket y arranca
+src/
+  config/                      ← configuración centralizada (lee variables de entorno)
+  app.js                       ← app Express: middlewares, rutas API, estáticos
+  routes/                      ← definición de rutas HTTP (sin lógica)
+  controllers/                 ← lógica de cada endpoint HTTP (idiomas, traducción)
+  services/
+    translation.service.js     ← única capa que conoce LibreTranslate
+  state/                        ← estado en memoria, encapsulado detrás de funciones
+    clientRegistry.js            (clientes conectados)
+    channelRepository.js         (canales: crear, miembros, historial)
+    publicHistoryStore.js        (historial de la sala pública)
+  websocket/
+    index.js                     ← composition root: instancia stores y conecta todo
+    broadcaster.js               ← enviar / difundir / listas a todos los clientes
+    handlers/                    ← un archivo por tipo de mensaje del protocolo
+      register.handler.js
+      publicMessage.handler.js
+      privateMessage.handler.js
+      typing.handler.js
+      channelCreate.handler.js
+      channelMessage.handler.js
+      channelAddMember.handler.js
+      channelRemoveMember.handler.js
+      channelDelete.handler.js
+      disconnect.handler.js
+  utils/                         ← id.js, time.js, limitedList.js (funciones puras)
+```
+
+**Principios aplicados:**
+- **Responsabilidad única**: cada handler resuelve un solo tipo de mensaje; cada store gestiona un solo tipo de estado.
+- **Inyección de dependencias explícita**: nada importa estado global a ciegas; cada handler recibe sus dependencias (`clientRegistry`, `broadcaster`, etc.) como parámetros, lo que los hace testeables de forma aislada.
+- **Capas separadas**: la capa HTTP (Express) y la capa WebSocket no se conocen entre sí; ambas comparten solo `services/` y `state/`.
+- **Abierto a extensión**: añadir un nuevo tipo de mensaje = crear su `handler.js` + una línea en `websocket/handlers/index.js`. No se toca nada más.
+
+### Frontend (`public/js/`)
+
+Sin build step: módulos ES nativos (`<script type="module">`), cargados directamente por el navegador.
+
+```
+main.js                         ← punto de entrada: conecta el socket y arranca los controladores
+config/                         ← URLs del backend
+core/
+  socketClient.js                 (única capa que toca el WebSocket crudo)
+  state.js                        (único estado mutable de la app)
+services/
+  translationService.js           (traducción de textos + idiomas)
+  backgroundService.js            (personalización de fondo + localStorage)
+ui/                                (funciones de render — no contienen lógica de red)
+  dom.js, badge.js, toast.js, panelManager.js, confirmDialog.js,
+  messagesView.js, usersView.js, channelsView.js, navigation.js
+handlers/
+  incomingMessageHandlers.js      (traduce cada mensaje entrante del servidor a una actualización de UI)
+controllers/                      (conectan eventos del DOM con servicios/estado)
+  loginController.js, chatController.js, channelController.js,
+  backgroundController.js, sidebarController.js
+```
+
+**Principios aplicados:**
+- **Un único punto de verdad para el estado** (`core/state.js`) en vez de variables globales sueltas.
+- **Separación vista / controlador**: los módulos de `ui/` solo dibujan; los de `controllers/` conectan clics con servicios.
+- **Sin parches sobre funciones existentes**: la detección de expulsión de un canal (antes implementada sobrescribiendo `renderizarCanales` desde fuera) ahora vive dentro de la propia función, en `channelsView.js`.
+
+---
+
+## 🧪 Pruebas
+
+Se incluye una suite de integración (`test/chat.test.js`, con el test runner nativo de Node) que levanta el servidor en un puerto efímero y verifica registro, mensajes públicos/privados, creación de canales, permisos de gestión y eliminación de canal:
+
+```bash
+npm test
+```
+
+---
+
+## 👥 Integrantes del Equipo
 
 | Nombre | GitHub |
 |--------|---------|
@@ -26,79 +100,30 @@ La aplicación incluye funcionalidades avanzadas como:
 
 ---
 
-# 🚀 Funcionalidades Implementadas
+## 🚀 Funcionalidades
 
-## 🏠 Chat en Sala
-Permite que múltiples usuarios se conecten y participen en una conversacion grupal en tiempo real.
-
-### Características:
-- Mensajes instantáneos.
-- Lista de usuarios conectados.
-- Historial de mensajes.
-
----
-
-## 🔒 Chat Privado
-Los usuarios pueden enviar mensajes directos entre dos personas sin que otros usuarios puedan visualizarlos.
-
-### Características:
-- Comunicación uno a uno.
-- Notificaciones privadas.
-- Historial independiente.
+- Chat en sala pública con historial.
+- Chat privado entre usuarios.
+- Traducción automática en tiempo real (LibreTranslate), por idioma de cada destinatario.
+- Canales de difusión con creador, miembros, gestión de miembros y eliminación.
+- Personalización del fondo del chat (color, degradado, URL de imagen o archivo local).
+- Indicador de "está escribiendo…".
+- Notificaciones toast no intrusivas (canal eliminado, expulsión de un canal).
 
 ---
 
-## 🌎 Traductor en Tiempo Real
-Integra traducción automática de mensajes para facilitar la comunicación entre usuarios de diferentes idiomas.
+## 🛠️ Tecnologías
 
-### Características:
-- Traducción automática al idioma seleccionado.
-- Soporte para múltiples idiomas.
-- Actualización en tiempo real.
+**Frontend:** HTML5, CSS3, JavaScript (ES Modules nativos, sin build).
+**Backend:** Node.js, Express, `ws` (WebSocket).
+**Traducción:** LibreTranslate (autohosteado vía Docker).
 
 ---
 
-## 📢 Canales de Difusión
-Permite enviar mensajes masivos a múltiples usuarios simultáneamente.
+## 🔧 Requisitos
 
-### Características:
-- Difusión global.
-- Envío de anuncios.
-- Comunicación administrativa.
-
----
-
-## 🎨 Personalización del Chat
-Los usuarios pueden modificar la apariencia del chat.
-
-### Opciones:
-- Cambio de color del fondo.
-- Fondos personalizados mediante imágenes.
-
----
-
-# 🛠️ Tecnologías Utilizadas
-
-## Frontend
-- HTML5
-- CSS3
-- JavaScript
-
-## Backend
-- Node.js
-- Socket.IO
-
-## Herramientas Adicionales
-- Git & GitHub
-- LibreTranslate: Herramienta de código libre para la generaciòn de un traductor autohosteado. (https://github.com/LibreTranslate/LibreTranslate.git)
-- Docker
-
----
-
-# 🔧 Requsitos 🪛
-- node.js
-- Docker
-- LibreTranslate
+- Node.js 18+ (se usa `fetch` nativo y el test runner integrado).
+- Docker (para LibreTranslate).
 
 ---
 
@@ -111,35 +136,25 @@ git clone https://github.com/netito74/Chat-de-WebSockets.git
 cd Chat-de-WebSockets
 ```
 
-### 2. Clonar la librería auxiliar
+### 2. Levantar LibreTranslate
 
 ```bash
 git clone https://github.com/LibreTranslate/LibreTranslate.git
+cd LibreTranslate
 ```
 
-### 3. Modificar archivo de configuración de la librería
+Editar `docker-compose.yml` con:
 
-Editar el archivo doker-compose.yml de LibreTranslate:
-
-```bash
-nano LibreTranslate\docker-compose.yml
-```
-
-Remplazar el contenido por:
-
-```bash
+```yaml
 services:
   libretranslate:
     image: libretranslate/libretranslate:latest
     container_name: libretranslate
-
     ports:
       - "5000:5000"
-
     environment:
       - LT_LOAD_ONLY=es,en,fr,de,it,pt
       - LT_UPDATE_MODELS=true
-
     volumes:
       - libretranslate_models:/home/libretranslate/.local
 
@@ -147,40 +162,32 @@ volumes:
   libretranslate_models:
 ```
 
-### 4. Ejecutar LibreTranslate
-
 ```bash
-cd LibreTranslate
 docker-compose up -d
 ```
 
-Mantener este proceso en ejecución.
-
-### 5. Ejecutar el proyecto principal
-
-Abrir otra terminal y ejecutar:
+### 3. Configurar variables de entorno (opcional)
 
 ```bash
-cd Chat-de-WebSockets
-npm install
-node server.js
+cp .env.example .env
+# Edita .env si necesitas otro puerto, host o límite de historial
 ```
 
-### 6. Acceder a la aplicación
-
-Una vez iniciado el proyecto, acceder desde el navegador a:
+### 4. Instalar dependencias y ejecutar
 
 ```bash
+npm install
+npm start
+```
+
+### 5. Acceder a la aplicación
+
+```
 http://localhost:3000
 ```
 
-# 📸 Evidencias de Funcionamiento
-
-## 🖼️ Capturas de Pantalla
-
-
 ---
 
-# 📄 Licencia
+## 📄 Licencia
 
 Este proyecto está bajo la licencia MIT.
