@@ -8,10 +8,10 @@ const router = express.Router();
 router.use(requireAuth);
 
 const GRADIENTS = {
-  agora_amanecer: 'linear-gradient(135deg, #F6E7D8 0%, #C1572A 100%)',
-  agora_egeo: 'linear-gradient(135deg, #E4F0EE 0%, #1F6F6B 100%)',
-  agora_noche: 'linear-gradient(135deg, #2B2640 0%, #1F6F6B 100%)',
-  agora_marmol: 'linear-gradient(135deg, #F4F1EA 0%, #C9C2B4 100%)',
+  agora_egeo: 'linear-gradient(135deg, #DEF7F1 0%, #1FA690 100%)',
+  agora_noche: 'linear-gradient(135deg, #1B2230 0%, #1A4878 100%)',
+  agora_marmol: 'linear-gradient(135deg, #F8F9FB 0%, #D7DCE5 100%)',
+  agora_amanecer: 'linear-gradient(135deg, #FBF3DC 0%, #C28E0E 100%)',
 };
 
 router.get('/gradients', (req, res) => {

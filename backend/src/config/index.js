@@ -37,15 +37,21 @@ module.exports = {
   },
 
   translation: {
-    // 'mock'   -> traductor offline por diccionario, util para desarrollo/demo
-    //             sin salida a internet (ver services/providers/mockProvider.js)
-    // 'google' -> Google Cloud Translation API (requiere GOOGLE_TRANSLATE_API_KEY)
-    // 'deepl'  -> DeepL API (requiere DEEPL_API_KEY)
-    provider: process.env.TRANSLATION_PROVIDER || 'mock',
+    // 'mymemory' -> API publica gratuita, traduccion real, sin API key
+    //               (ver services/providers/myMemoryProvider.js). DEFAULT.
+    // 'mock'     -> traductor offline por diccionario muy limitado, solo
+    //               para pruebas sin salida a internet en absoluto
+    //               (ver services/providers/mockProvider.js)
+    // 'google'   -> Google Cloud Translation API (requiere GOOGLE_TRANSLATE_API_KEY)
+    // 'deepl'    -> DeepL API (requiere DEEPL_API_KEY)
+    provider: process.env.TRANSLATION_PROVIDER || 'mymemory',
     cacheTtlMs: parseInt(process.env.TRANSLATION_CACHE_TTL_MS || String(1000 * 60 * 60), 10),
     cacheMaxEntries: parseInt(process.env.TRANSLATION_CACHE_MAX || '5000', 10),
     googleApiKey: process.env.GOOGLE_TRANSLATE_API_KEY || '',
     deeplApiKey: process.env.DEEPL_API_KEY || '',
+    // Opcional: con un correo configurado, MyMemory eleva el limite gratuito
+    // de 5,000 a 50,000 caracteres/dia (no requiere verificacion del correo).
+    myMemoryEmail: process.env.MYMEMORY_EMAIL || '',
   },
 
   supportedLanguages: ['es', 'en'],

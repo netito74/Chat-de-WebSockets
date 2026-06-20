@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   username        TEXT NOT NULL UNIQUE,
   password_hash   TEXT NOT NULL,
   preferred_lang  TEXT NOT NULL DEFAULT 'es',
-  avatar_color    TEXT NOT NULL DEFAULT '#2B6CB0',
+  avatar_color    TEXT NOT NULL DEFAULT '#1A4878',
   is_online       INTEGER NOT NULL DEFAULT 0,
   last_seen_at    TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))

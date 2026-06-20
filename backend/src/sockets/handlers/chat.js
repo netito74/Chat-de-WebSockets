@@ -54,10 +54,21 @@ function serialize(message, sender, translations) {
  * mismo del primer mensaje: sin esto, el destinatario no recibiria el
  * evento en tiempo real hasta abrir manualmente esa conversacion.
  */
-function ensureMembersJoined(io, conversationId) {
+async function ensureMembersJoined(io, conversationId) {
   const members = conversationService.getMembers(conversationId);
-  for (const m of members) {
-    io.in(`user:${m.id}`).socketsJoin(conversationId);
+  // `socketsJoin` del adaptador de Redis es asincrono (implica una
+  // ida y vuelta por Redis para que el socket remoto se una a la sala);
+  // sin esperar esta promesa, el siguiente `io.to(conversationId).emit(...)`
+  // puede ejecutarse ANTES de que el destinatario quede realmente unido a
+  // la sala, perdiendo el primer mensaje (condicion de carrera).
+  await Promise.all(members.map((m) => io.in(`user:${m.id}`).socketsJoin(conversationId)));
+}
+
+/** Mismo patron de entrega por canal personal que `message:new`, para las confirmaciones de entrega/lectura. */
+function broadcastStatus(io, conversationId, messageId, status) {
+  const members = conversationService.getMembers(conversationId);
+  for (const member of members) {
+    io.to(`user:${member.id}`).emit('message:status', { conversationId, messageId, status });
   }
 }
 
@@ -84,7 +95,7 @@ function registerChatHandlers(io, socket) {
         return cb?.({ ok: false, error: 'No perteneces a esta conversacion' });
       }
       socket.join(conversationId);
-      ensureMembersJoined(io, conversationId);
+      await ensureMembersJoined(io, conversationId);
       const sender = userService.findById(userId);
       const message = messageService.create({
         clientMsgId,
@@ -96,9 +107,19 @@ function registerChatHandlers(io, socket) {
       const translations = await buildTranslations(message);
       const payload = serialize(message, sender, translations);
 
-      // El adaptador de Redis propaga este emit a todos los nodos del
-      // cluster que tengan sockets unidos a esta sala (ver sockets/index.js).
-      io.to(conversationId).emit('message:new', payload);
+      // Entrega por canal personal (`user:<id>`) en vez de por la sala de la
+      // conversacion: cada socket se une a su propio canal `user:<id>` de
+      // forma SINCRONA en el momento de conectarse (ver handlers/presence.js,
+      // handleConnect), asi que esta entrega nunca depende de que un join
+      // dinamico a la sala de la conversacion (ensureMembersJoined, que es
+      // asincrono con el adaptador de Redis) haya terminado a tiempo. Esto
+      // cubre tanto multiples pestañas/dispositivos del mismo usuario como
+      // instancias remotas del cluster (el adaptador de Redis tambien
+      // propaga `io.to('user:id')` entre procesos).
+      const members = conversationService.getMembers(conversationId);
+      for (const member of members) {
+        io.to(`user:${member.id}`).emit('message:new', payload);
+      }
       cb?.({ ok: true, message: payload });
     } catch (err) {
       cb?.({ ok: false, error: err.message });
@@ -111,11 +132,7 @@ function registerChatHandlers(io, socket) {
     if (!conversationId || !messageId) return;
     if (!conversationService.isMember(conversationId, userId)) return;
     const updated = messageService.markStatus(messageId, 'delivered');
-    io.to(conversationId).emit('message:status', {
-      conversationId,
-      messageId,
-      status: updated.status,
-    });
+    broadcastStatus(io, conversationId, messageId, updated.status);
   });
 
   socket.on('message:read', (data) => {
@@ -123,11 +140,7 @@ function registerChatHandlers(io, socket) {
     if (!conversationId || !messageId) return;
     if (!conversationService.isMember(conversationId, userId)) return;
     const updated = messageService.markStatus(messageId, 'read');
-    io.to(conversationId).emit('message:status', {
-      conversationId,
-      messageId,
-      status: updated.status,
-    });
+    broadcastStatus(io, conversationId, messageId, updated.status);
   });
 
   socket.on('typing', (data) => {

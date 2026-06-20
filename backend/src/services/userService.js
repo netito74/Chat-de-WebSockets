@@ -16,7 +16,7 @@ function toPublic(user) {
   };
 }
 
-const AVATAR_PALETTE = ['#2B6CB0', '#C1572A', '#1F6F6B', '#8E5572', '#B08900', '#3D5A80'];
+const AVATAR_PALETTE = ['#1A4878', '#2BC8AE', '#C28E0E', '#7C6FB0', '#C2674F', '#4A8FA3'];
 function colorFor(username) {
   let hash = 0;
   for (let i = 0; i < username.length; i++) hash = (hash * 31 + username.charCodeAt(i)) >>> 0;

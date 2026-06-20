@@ -23,7 +23,7 @@ function requireAdmin(req, res, conversationId) {
   return true;
 }
 
-router.post('/', (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
     const input = validators.createGroup.parse(req.body);
     const memberIds = [];
@@ -39,11 +39,15 @@ router.post('/', (req, res, next) => {
     const full = conversationService.listForUser(req.user.id).find((c) => c.id === group.id);
 
     // Une en tiempo real los sockets activos de todos los miembros a la
-    // nueva sala (ver sockets/handlers/chat.js, ensureMembersJoined).
+    // nueva sala (ver sockets/handlers/chat.js, ensureMembersJoined). Se
+    // espera la promesa: con el adaptador de Redis, socketsJoin implica una
+    // ida y vuelta asincrona, y emitir 'group:created' antes de que termine
+    // no garantiza que el destinatario ya este en la sala para recibir
+    // mensajes inmediatamente despues.
     const io = req.app.get('io');
     if (io) {
       const { ensureMembersJoined } = require('../sockets/handlers/chat');
-      ensureMembersJoined(io, group.id);
+      await ensureMembersJoined(io, group.id);
       for (const uid of [...memberIds, req.user.id]) {
         io.to(`user:${uid}`).emit('group:created', full);
       }
@@ -70,7 +74,7 @@ router.patch('/:id', (req, res, next) => {
   }
 });
 
-router.post('/:id/members', (req, res, next) => {
+router.post('/:id/members', async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!requireAdmin(req, res, id)) return;
@@ -91,7 +95,7 @@ router.post('/:id/members', (req, res, next) => {
     });
     if (io && added.length) {
       const { ensureMembersJoined } = require('../sockets/handlers/chat');
-      ensureMembersJoined(io, id);
+      await ensureMembersJoined(io, id);
     }
     res.json({ added });
   } catch (err) {

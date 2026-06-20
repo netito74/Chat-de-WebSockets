@@ -4,11 +4,12 @@ const db = require('../db/db');
 const config = require('../config');
 
 const mockProvider = require('./providers/mockProvider');
+const myMemoryProvider = require('./providers/myMemoryProvider');
 const googleProvider = require('./providers/googleProvider');
 const deeplProvider = require('./providers/deeplProvider');
 
-const PROVIDERS = { mock: mockProvider, google: googleProvider, deepl: deeplProvider };
-const activeProvider = PROVIDERS[config.translation.provider] || mockProvider;
+const PROVIDERS = { mock: mockProvider, mymemory: myMemoryProvider, google: googleProvider, deepl: deeplProvider };
+const activeProvider = PROVIDERS[config.translation.provider] || myMemoryProvider;
 
 // Cache nivel 1: memoria de proceso (rapida, se pierde al reiniciar el nodo).
 const memoryCache = new LRUCache({
