@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agora · Mensajeria en tiempo real</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+  <!-- ===================== PANTALLA DE AUTENTICACION ===================== -->
+  <main id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="brand">
+        <span class="brand-columns" aria-hidden="true"></span>
+        <h1 class="brand-name">Agora</h1>
+        <p class="brand-tagline">La plaza publica para tu equipo, en cualquier idioma.</p>
+      </div>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab is-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesion</button>
+        <button class="auth-tab" data-tab="register" role="tab" aria-selected="false">Crear cuenta</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label class="field">
+          <span>Usuario</span>
+          <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="24" />
+        </label>
+        <label class="field">
+          <span>Contrasena</span>
+          <input type="password" name="password" autocomplete="current-password" required minlength="8" />
+        </label>
+        <button type="submit" class="btn btn-primary">Entrar a la plaza</button>
+        <p class="auth-error" data-error-for="login"></p>
+      </form>
+
+      <form id="register-form" class="auth-form is-hidden">
+        <label class="field">
+          <span>Usuario</span>
+          <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_\-]+" title="Solo letras, numeros, guion y guion bajo" />
+        </label>
+        <label class="field">
+          <span>Contrasena</span>
+          <input type="password" name="password" autocomplete="new-password" required minlength="8" />
+        </label>
+        <label class="field">
+          <span>Idioma preferido</span>
+          <select name="preferredLang">
+            <option value="es">Espanol</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <button type="submit" class="btn btn-primary">Crear cuenta</button>
+        <p class="auth-error" data-error-for="register"></p>
+      </form>
+    </div>
+  </main>
+
+  <!-- ===================== APLICACION PRINCIPAL ===================== -->
+  <div id="app-screen" class="app-shell is-hidden">
+
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="brand-columns brand-columns--small" aria-hidden="true"></span>
+        <h1 class="brand-name brand-name--small">Agora</h1>
+        <button id="btn-settings" class="icon-btn" title="Ajustes" aria-label="Ajustes">&#9881;</button>
+      </div>
+
+      <div class="connection-banner" id="connection-banner" data-state="online">
+        <span class="dot"></span>
+        <span id="connection-text">Conectado</span>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="btn-new-private" class="btn btn-ghost btn-sm">+ Chat privado</button>
+        <button id="btn-new-group" class="btn btn-ghost btn-sm">+ Grupo</button>
+      </div>
+
+      <nav class="conversation-list" id="conversation-list" aria-label="Conversaciones"></nav>
+
+      <div class="sidebar-footer">
+        <span class="avatar" id="me-avatar"></span>
+        <div class="me-info">
+          <strong id="me-username"></strong>
+          <small id="me-lang"></small>
+        </div>
+        <button id="btn-logout" class="icon-btn" title="Cerrar sesion" aria-label="Cerrar sesion">&#10162;</button>
+      </div>
+    </aside>
+
+    <section class="chat-panel" id="chat-panel">
+      <div class="chat-empty" id="chat-empty">
+        <span class="brand-columns" aria-hidden="true"></span>
+        <p>Elige una conversacion o crea una nueva para comenzar.</p>
+      </div>
+
+      <div class="chat-active is-hidden" id="chat-active">
+        <header class="chat-header">
+          <div>
+            <h2 id="chat-title">&nbsp;</h2>
+            <small id="chat-subtitle"></small>
+          </div>
+          <div class="chat-header-actions">
+            <button id="btn-group-info" class="icon-btn is-hidden" title="Detalles del grupo">&#8505;</button>
+          </div>
+        </header>
+
+        <div class="messages" id="messages" aria-live="polite"></div>
+
+        <div class="typing-indicator is-hidden" id="typing-indicator"></div>
+
+        <form id="message-form" class="message-form">
+          <input type="text" id="message-input" maxlength="4000" placeholder="Escribe un mensaje..." autocomplete="off" />
+          <button type="submit" class="btn btn-primary">Enviar</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===================== MODALES ===================== -->
+  <div class="modal-overlay is-hidden" id="modal-overlay">
+
+    <div class="modal" id="modal-new-private" hidden>
+      <h3>Nuevo chat privado</h3>
+      <p class="muted">Elige con quien quieres hablar.</p>
+      <ul class="user-pick-list" id="private-user-list"></ul>
+      <div class="modal-actions"><button class="btn btn-ghost" data-close-modal>Cerrar</button></div>
+    </div>
+
+    <div class="modal" id="modal-new-group" hidden>
+      <h3>Crear grupo</h3>
+      <label class="field">
+        <span>Nombre del grupo</span>
+        <input type="text" id="group-name-input" maxlength="60" minlength="2" />
+      </label>
+      <p class="muted">Selecciona participantes</p>
+      <ul class="user-pick-list" id="group-user-list"></ul>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-close-modal>Cancelar</button>
+        <button class="btn btn-primary" id="btn-create-group">Crear grupo</button>
+      </div>
+      <p class="auth-error" id="group-create-error"></p>
+    </div>
+
+    <div class="modal" id="modal-group-info" hidden>
+      <h3>Detalles del grupo</h3>
+      <label class="field" id="rename-field">
+        <span>Nombre</span>
+        <div class="inline-edit">
+          <input type="text" id="group-rename-input" maxlength="60" minlength="2" />
+          <button class="btn btn-sm" id="btn-group-rename">Guardar</button>
+        </div>
+      </label>
+      <p class="muted">Miembros</p>
+      <ul class="member-list" id="group-member-list"></ul>
+      <div class="add-member-row">
+        <input type="text" id="add-member-input" placeholder="usuario a agregar" maxlength="24" />
+        <button class="btn btn-sm" id="btn-add-member">Agregar</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-leave-group">Abandonar grupo</button>
+        <button class="btn btn-danger is-hidden" id="btn-delete-group">Eliminar grupo</button>
+        <button class="btn btn-ghost" data-close-modal>Cerrar</button>
+      </div>
+      <p class="auth-error" id="group-info-error"></p>
+    </div>
+
+    <div class="modal" id="modal-settings" hidden>
+      <h3>Personalizar fondo de chat</h3>
+      <p class="muted">Gradientes predefinidos</p>
+      <div class="gradient-grid" id="gradient-grid"></div>
+      <p class="muted">O usa una URL de imagen</p>
+      <div class="inline-edit">
+        <input type="url" id="bg-url-input" placeholder="https://..." />
+        <button class="btn btn-sm" id="btn-bg-url">Usar URL</button>
+      </div>
+      <p class="muted">O sube tu propia imagen (max. 5&nbsp;MB)</p>
+      <input type="file" id="bg-file-input" accept="image/png,image/jpeg,image/webp,image/gif" />
+      <div class="modal-actions"><button class="btn btn-ghost" data-close-modal>Cerrar</button></div>
+      <p class="auth-error" id="settings-error"></p>
+    </div>
+
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="assertive"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

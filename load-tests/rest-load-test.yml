@@ -1,0 +1,56 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - name: "Calentamiento"
+      duration: 10
+      arrivalRate: 5
+    - name: "Carga sostenida"
+      duration: 30
+      arrivalRate: 20
+    - name: "Pico"
+      duration: 20
+      arrivalRate: 50
+  processor: "./processor.js"
+  ensure:
+    maxErrorRate: 5
+
+scenarios:
+  - name: "Registro + login + listar conversaciones + historial"
+    flow:
+      - function: "generateUsername"
+      - post:
+          url: "/api/auth/register"
+          json:
+            username: "{{ username }}"
+            password: "password123"
+            preferredLang: "es"
+          capture:
+            json: "$.token"
+            as: "token"
+          expect:
+            - statusCode: 201
+      - get:
+          url: "/api/auth/me"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/api/users/conversations"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/api/users/conversations/public/history"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+      - post:
+          url: "/api/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "password123"
+          expect:
+            - statusCode: 200
