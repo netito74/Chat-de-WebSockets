@@ -9,7 +9,7 @@ function initials(name) {
 function avatarEl(label, color, { presence = false, online = false } = {}) {
   const span = document.createElement('span');
   span.className = `avatar${presence ? ' with-presence' : ''}${online ? ' online' : ''}`;
-  span.style.background = color || '#786F61';
+  span.style.background = color || '#6B7585';
   span.textContent = initials(label);
   return span;
 }
@@ -23,20 +23,42 @@ function timePreview(iso) {
 export function renderConversationList(onSelect) {
   const container = document.getElementById('conversation-list');
   container.innerHTML = '';
-  const items = [...state.conversations.values()].sort((a, b) => {
+  const query = (document.getElementById('conversation-search')?.value || '').trim().toLowerCase();
+
+  let items = [...state.conversations.values()].sort((a, b) => {
     if (a.type === 'public') return -1;
     if (b.type === 'public') return 1;
     return (b.lastMessageAt || '').localeCompare(a.lastMessageAt || '');
   });
 
+  if (query) {
+    items = items.filter((conv) => conv.name?.toLowerCase().includes(query));
+  }
+
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'conversation-list-empty';
+    empty.textContent = query ? 'Ninguna conversacion coincide con tu busqueda.' : 'Aun no tienes conversaciones.';
+    container.appendChild(empty);
+    return;
+  }
+
   for (const conv of items) {
     const btn = document.createElement('button');
-    btn.className = `conv-item${conv.id === state.activeConversationId ? ' is-active' : ''}`;
+    const unread = state.unreadCounts[conv.id] || 0;
+    btn.className = `conv-item${conv.id === state.activeConversationId ? ' is-active' : ''}${unread > 0 ? ' has-unread' : ''}`;
     btn.dataset.conversationId = conv.id;
 
-    const color = conv.type === 'private' ? conv.peer?.avatarColor : '#1F6F6B';
+    const color = conv.type === 'private' ? conv.peer?.avatarColor : '#2BC8AE';
     const online = conv.type === 'private' ? !!conv.peer?.isOnline : false;
-    btn.appendChild(avatarEl(conv.name, color, { presence: conv.type === 'private', online }));
+    const avatar = avatarEl(conv.name, color, { presence: conv.type === 'private', online });
+    if (unread > 0) {
+      const bubble = document.createElement('span');
+      bubble.className = 'unread-bubble';
+      bubble.textContent = unread > 9 ? '9+' : String(unread);
+      avatar.appendChild(bubble);
+    }
+    btn.appendChild(avatar);
 
     const meta = document.createElement('span');
     meta.className = 'conv-meta';

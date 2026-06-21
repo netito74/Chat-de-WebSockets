@@ -3,7 +3,7 @@ import { state } from '../state.js';
 import { toast } from './toast.js';
 
 function avatarColor(seed) {
-  return seed || '#786F61';
+  return seed || '#6B7585';
 }
 
 export function renderGroupInfo(conv, { onChanged, onLeftOrDeleted }) {

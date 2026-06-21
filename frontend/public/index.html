@@ -2,8 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Agora · Mensajeria en tiempo real</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 <body>
@@ -12,8 +16,7 @@
   <main id="auth-screen" class="auth-screen">
     <div class="auth-card">
       <div class="brand">
-        <span class="brand-columns" aria-hidden="true"></span>
-        <h1 class="brand-name">Agora</h1>
+        <img src="/assets/logo-full.png" alt="Agora" class="brand-logo-full" />
         <p class="brand-tagline">La plaza publica para tu equipo, en cualquier idioma.</p>
       </div>
 
@@ -25,24 +28,27 @@
       <form id="login-form" class="auth-form">
         <label class="field">
           <span>Usuario</span>
-          <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="24" />
+          <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="24" placeholder="tu_usuario" />
         </label>
         <label class="field">
           <span>Contrasena</span>
-          <input type="password" name="password" autocomplete="current-password" required minlength="8" />
+          <input type="password" name="password" autocomplete="current-password" required minlength="8" placeholder="••••••••" />
         </label>
-        <button type="submit" class="btn btn-primary">Entrar a la plaza</button>
+        <button type="submit" class="btn btn-primary btn-block">
+          Entrar a la plaza
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
         <p class="auth-error" data-error-for="login"></p>
       </form>
 
       <form id="register-form" class="auth-form is-hidden">
         <label class="field">
           <span>Usuario</span>
-          <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_\-]+" title="Solo letras, numeros, guion y guion bajo" />
+          <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_\-]+" title="Solo letras, numeros, guion y guion bajo" placeholder="tu_usuario" />
         </label>
         <label class="field">
           <span>Contrasena</span>
-          <input type="password" name="password" autocomplete="new-password" required minlength="8" />
+          <input type="password" name="password" autocomplete="new-password" required minlength="8" placeholder="Minimo 8 caracteres" />
         </label>
         <label class="field">
           <span>Idioma preferido</span>
@@ -51,7 +57,10 @@
             <option value="en">English</option>
           </select>
         </label>
-        <button type="submit" class="btn btn-primary">Crear cuenta</button>
+        <button type="submit" class="btn btn-primary btn-block">
+          Crear cuenta
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
         <p class="auth-error" data-error-for="register"></p>
       </form>
     </div>
@@ -62,9 +71,8 @@
 
     <aside class="sidebar">
       <div class="sidebar-header">
-        <span class="brand-columns brand-columns--small" aria-hidden="true"></span>
-        <h1 class="brand-name brand-name--small">Agora</h1>
-        <button id="btn-settings" class="icon-btn" title="Ajustes" aria-label="Ajustes">&#9881;</button>
+        <img src="/assets/logo-mark-64.png" alt="" class="brand-logo-mark" />
+        <span class="brand-name-small">Agora</span>
       </div>
 
       <div class="connection-banner" id="connection-banner" data-state="online">
@@ -72,37 +80,73 @@
         <span id="connection-text">Conectado</span>
       </div>
 
+      <div class="sidebar-search">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="search" id="conversation-search" placeholder="Buscar conversaciones..." aria-label="Buscar conversaciones" />
+      </div>
+
       <div class="sidebar-actions">
-        <button id="btn-new-private" class="btn btn-ghost btn-sm">+ Chat privado</button>
-        <button id="btn-new-group" class="btn btn-ghost btn-sm">+ Grupo</button>
+        <div class="popover-wrap">
+          <button id="btn-new-chat" class="btn btn-primary btn-block" type="button" aria-haspopup="menu" aria-expanded="false">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Nueva conversacion
+          </button>
+          <div id="new-chat-menu" class="popover-menu is-hidden" role="menu">
+            <button id="btn-new-private" class="popover-item" role="menuitem" type="button">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+              Chat privado
+            </button>
+            <button id="btn-new-group" class="popover-item" role="menuitem" type="button">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="3"/><path d="M3 20c0-3.6 2.8-6 6.5-6 1.6 0 3 .4 4.1 1.1M13.5 14.4c2.6.4 4.5 2.3 4.5 5.6"/></svg>
+              Grupo
+            </button>
+          </div>
+        </div>
       </div>
 
       <nav class="conversation-list" id="conversation-list" aria-label="Conversaciones"></nav>
 
-      <div class="sidebar-footer">
-        <span class="avatar" id="me-avatar"></span>
-        <div class="me-info">
-          <strong id="me-username"></strong>
-          <small id="me-lang"></small>
+      <div class="sidebar-footer popover-wrap popover-wrap--up">
+        <button id="btn-account-menu" class="account-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar" id="me-avatar"></span>
+          <span class="me-info">
+            <strong id="me-username"></strong>
+            <small id="me-lang"></small>
+          </span>
+          <svg class="icon chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+        <div id="account-menu" class="popover-menu popover-menu--up is-hidden" role="menu">
+          <button id="btn-logout" class="popover-item popover-item--danger" role="menuitem" type="button">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            Cerrar sesion
+          </button>
         </div>
-        <button id="btn-logout" class="icon-btn" title="Cerrar sesion" aria-label="Cerrar sesion">&#10162;</button>
       </div>
     </aside>
 
     <section class="chat-panel" id="chat-panel">
       <div class="chat-empty" id="chat-empty">
-        <span class="brand-columns" aria-hidden="true"></span>
-        <p>Elige una conversacion o crea una nueva para comenzar.</p>
+        <img src="/assets/logo-mark.png" alt="" class="chat-empty-mark" />
+        <h3>Bienvenido a Agora</h3>
+        <p>Elige una conversacion o crea una nueva para comenzar a chatear.</p>
       </div>
 
       <div class="chat-active is-hidden" id="chat-active">
         <header class="chat-header">
-          <div>
+          <button id="btn-mobile-back" class="icon-btn btn-mobile-back" title="Volver a conversaciones" aria-label="Volver a conversaciones">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="chat-header-title">
             <h2 id="chat-title">&nbsp;</h2>
             <small id="chat-subtitle"></small>
           </div>
           <div class="chat-header-actions">
-            <button id="btn-group-info" class="icon-btn is-hidden" title="Detalles del grupo">&#8505;</button>
+            <button id="btn-settings" class="icon-btn" title="Personalizar fondo" aria-label="Personalizar fondo del chat">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+            </button>
+            <button id="btn-group-info" class="icon-btn is-hidden" title="Detalles del grupo" aria-label="Detalles del grupo">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+            </button>
           </div>
         </header>
 
@@ -112,7 +156,9 @@
 
         <form id="message-form" class="message-form">
           <input type="text" id="message-input" maxlength="4000" placeholder="Escribe un mensaje..." autocomplete="off" />
-          <button type="submit" class="btn btn-primary">Enviar</button>
+          <button type="submit" class="btn btn-primary btn-send" aria-label="Enviar mensaje">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
         </form>
       </div>
     </section>
@@ -132,7 +178,7 @@
       <h3>Crear grupo</h3>
       <label class="field">
         <span>Nombre del grupo</span>
-        <input type="text" id="group-name-input" maxlength="60" minlength="2" />
+        <input type="text" id="group-name-input" maxlength="60" minlength="2" placeholder="Ej. Equipo de Marketing" />
       </label>
       <p class="muted">Selecciona participantes</p>
       <ul class="user-pick-list" id="group-user-list"></ul>

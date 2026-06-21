@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { state, clearSession, persistSessionFields, setLastSeen } from './state.js';
+import { state, clearSession, persistSessionFields, setLastSeen, incrementUnread, clearUnread } from './state.js';
 import { createSocket, getSocket, joinConversation, requestSync, ackDelivered } from './socket.js';
 import { initAuthScreen } from './ui/auth.js';
 import { renderConversationList, setConversationPresence, wireSidebarActions } from './ui/sidebar.js';
@@ -54,6 +54,7 @@ function setConnectionState(connState) {
 // ------------------------------------------------------ seleccion de chat
 async function selectConversation(conversationId) {
   state.activeConversationId = conversationId;
+  clearUnread(conversationId); // notificaciones: abrir la conversacion quita su burbuja de no-leidos
   persistSessionFields();
   renderConversationList(selectConversation);
 
@@ -62,6 +63,7 @@ async function selectConversation(conversationId) {
 
   document.getElementById('chat-empty').classList.add('is-hidden');
   document.getElementById('chat-active').classList.remove('is-hidden');
+  document.getElementById('app-screen').classList.add('is-chat-active'); // navegacion movil: muestra el chat, oculta la lista
   document.getElementById('chat-title').textContent = conv.name;
   document.getElementById('chat-subtitle').textContent =
     conv.type === 'public'
@@ -155,14 +157,38 @@ function wireSocketEvents() {
     }
   });
 
-  socket.on('message:new', (message) => {
-    const conv = state.conversations.get(message.conversationId);
+  socket.on('message:new', async (message) => {
+    let conv = state.conversations.get(message.conversationId);
+    if (!conv) {
+      // Conversacion desconocida para este cliente: pasa normalmente cuando
+      // OTRA persona inicia por primera vez un chat privado con nosotros
+      // (el servidor crea la conversacion al vuelo, pero este cliente
+      // todavia no tiene esa fila en `state.conversations`). Se refresca la
+      // lista antes de continuar para que aparezca en el sidebar y la
+      // notificacion tenga el nombre/tipo correcto.
+      await loadConversations();
+      conv = state.conversations.get(message.conversationId);
+    }
     appendIncomingMessage(message.conversationId, message);
-    if (message.conversationId !== state.activeConversationId) {
-      renderConversationList(selectConversation);
-    } else if (conv) {
+    if (conv) {
       conv.lastMessage = message.content;
       conv.lastMessageAt = message.createdAt;
+    }
+    if (message.conversationId !== state.activeConversationId) {
+      // Notificaciones: si el mensaje no es propio y la conversacion no
+      // esta abierta, se suma a la burbuja de no-leidos y se muestra un
+      // emergente clicable que salta directo a esa conversacion.
+      if (message.senderId !== state.user.id) {
+        incrementUnread(message.conversationId);
+        const isGroupOrPublic = conv?.type === 'group' || conv?.type === 'public';
+        const title = isGroupOrPublic
+          ? `${message.senderUsername} · ${conv.name}`
+          : `Nuevo mensaje de ${message.senderUsername}`;
+        const myLang = state.user.preferredLang;
+        const preview = message.translations?.[myLang] ?? message.content;
+        toast(preview, { title, onClick: () => selectConversation(message.conversationId) });
+      }
+      renderConversationList(selectConversation);
     }
     if (message.senderId !== state.user.id) ackDelivered(message.conversationId, message.id);
   });
@@ -232,6 +258,65 @@ function showEmptyChat() {
   persistSessionFields();
   document.getElementById('chat-active').classList.add('is-hidden');
   document.getElementById('chat-empty').classList.remove('is-hidden');
+  document.getElementById('app-screen').classList.remove('is-chat-active'); // navegacion movil: vuelve a la lista
+}
+
+/** Boton "<-" del encabezado del chat (solo visible en movil): vuelve a la lista sin perder la conversacion activa. */
+function wireMobileNav() {
+  document.getElementById('btn-mobile-back').addEventListener('click', () => {
+    document.getElementById('app-screen').classList.remove('is-chat-active');
+  });
+}
+
+/**
+ * Menus flotantes genericos (nueva conversacion / cuenta). Cada par
+ * trigger+menu vive dentro de un ".popover-wrap"; un solo listener
+ * delegado se encarga de abrir/cerrar todos, cerrar al hacer clic afuera,
+ * cerrar con Escape, y cerrar automaticamente al elegir una opcion.
+ */
+function wirePopovers() {
+  const triggers = [
+    { trigger: document.getElementById('btn-new-chat'), menu: document.getElementById('new-chat-menu') },
+    { trigger: document.getElementById('btn-account-menu'), menu: document.getElementById('account-menu') },
+  ];
+
+  function closeAll() {
+    for (const { trigger, menu } of triggers) {
+      menu.classList.add('is-hidden');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  for (const { trigger, menu } of triggers) {
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = menu.classList.contains('is-hidden');
+      closeAll();
+      if (willOpen) {
+        menu.classList.remove('is-hidden');
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.popover-item')) {
+      closeAll();
+      return;
+    }
+    if (!e.target.closest('.popover-wrap')) closeAll();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAll();
+  });
+}
+
+/** Filtra la lista de conversaciones visibles segun el texto del buscador. */
+function wireConversationSearch() {
+  const input = document.getElementById('conversation-search');
+  input.addEventListener('input', () => {
+    renderConversationList(selectConversation);
+  });
 }
 
 // --------------------------------------------------------------- arranque
@@ -247,6 +332,9 @@ async function startApp() {
   createSocket();
   wireSocketEvents();
   wireMessageForm();
+  wireMobileNav();
+  wirePopovers();
+  wireConversationSearch();
 
   wireSidebarActions({
     openModal,

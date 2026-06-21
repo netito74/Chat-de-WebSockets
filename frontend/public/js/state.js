@@ -30,6 +30,7 @@ export const state = {
   activeConversationId: persisted.activeConversationId || null,
   lastSeenMessageId: persisted.lastSeenMessageId || {}, // { [conversationId]: number }
   outbox: persisted.outbox || {}, // { [conversationId]: [{clientMsgId, content, composedAt}] }
+  unreadCounts: persisted.unreadCounts || {}, // { [conversationId]: number } - notificaciones/burbuja en la lista
 
   conversations: new Map(), // id -> conversation meta
   messagesByConversation: new Map(), // id -> array of message objects (ordenados asc por id)
@@ -43,6 +44,7 @@ export function persistSessionFields() {
     activeConversationId: state.activeConversationId,
     lastSeenMessageId: state.lastSeenMessageId,
     outbox: state.outbox,
+    unreadCounts: state.unreadCounts,
   });
 }
 
@@ -53,6 +55,7 @@ export function clearSession() {
   state.activeConversationId = null;
   state.lastSeenMessageId = {};
   state.outbox = {};
+  state.unreadCounts = {};
   state.conversations.clear();
   state.messagesByConversation.clear();
   state.usersById.clear();
@@ -62,6 +65,20 @@ export function setLastSeen(conversationId, messageId) {
   const current = state.lastSeenMessageId[conversationId] || 0;
   if (messageId > current) {
     state.lastSeenMessageId[conversationId] = messageId;
+    persistSessionFields();
+  }
+}
+
+/** Notificaciones: suma 1 al contador de no-leidos de una conversacion (burbuja en la lista). */
+export function incrementUnread(conversationId) {
+  state.unreadCounts[conversationId] = (state.unreadCounts[conversationId] || 0) + 1;
+  persistSessionFields();
+}
+
+/** Se llama al abrir una conversacion: quita su burbuja de no-leidos. */
+export function clearUnread(conversationId) {
+  if (state.unreadCounts[conversationId]) {
+    delete state.unreadCounts[conversationId];
     persistSessionFields();
   }
 }

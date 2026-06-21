@@ -1,92 +1,194 @@
-# 💬 Chat en Tiempo Real con WebSockets
+# Agora
 
-## 📌 Descripción General
-
-Aplicación de chat en tiempo real con WebSockets que permite comunicación instantánea entre múltiples usuarios, con sala pública, chats privados, canales de difusión, traducción automática y personalización visual.
-
-Esta versión conserva el 100% de las funcionalidades del proyecto original, pero reorganiza tanto el backend como el frontend en **capas con responsabilidades únicas**, en vez de dos archivos monolíticos (`server.js` y `app.js`). El objetivo: que añadir una funcionalidad nueva, o cambiar una existente (p. ej. cambiar de LibreTranslate a otro traductor), implique tocar uno o dos archivos pequeños y predecibles, no rastrear lógica mezclada en un archivo de mil líneas.
+Plataforma de mensajería en tiempo real con salas públicas, chats privados, grupos y traducción automática entre idiomas. Construida con Node.js, Socket.IO y Redis, pensada para escalar horizontalmente entre múltiples instancias.
 
 ---
 
-## 🏗️ Arquitectura
+## 1. Complementos implementados
 
-### Backend (`src/`)
+### Autenticación
+- Registro e inicio de sesión con usuario/contraseña.
+- Contraseñas protegidas con **bcrypt** (12 rondas).
+- Sesión basada en **JWT** (12h de expiración), enviada también en el handshake de Socket.IO.
+- Selección de idioma preferido al registrarse (Español/Inglés), con arquitectura extensible a más idiomas.
 
-```
-server.js                      ← punto de entrada: ensambla HTTP + WebSocket y arranca
-src/
-  config/                      ← configuración centralizada (lee variables de entorno)
-  app.js                       ← app Express: middlewares, rutas API, estáticos
-  routes/                      ← definición de rutas HTTP (sin lógica)
-  controllers/                 ← lógica de cada endpoint HTTP (idiomas, traducción)
-  services/
-    translation.service.js     ← única capa que conoce LibreTranslate
-  state/                        ← estado en memoria, encapsulado detrás de funciones
-    clientRegistry.js            (clientes conectados)
-    channelRepository.js         (canales: crear, miembros, historial)
-    publicHistoryStore.js        (historial de la sala pública)
-  websocket/
-    index.js                     ← composition root: instancia stores y conecta todo
-    broadcaster.js               ← enviar / difundir / listas a todos los clientes
-    handlers/                    ← un archivo por tipo de mensaje del protocolo
-      register.handler.js
-      publicMessage.handler.js
-      privateMessage.handler.js
-      typing.handler.js
-      channelCreate.handler.js
-      channelMessage.handler.js
-      channelAddMember.handler.js
-      channelRemoveMember.handler.js
-      channelDelete.handler.js
-      disconnect.handler.js
-  utils/                         ← id.js, time.js, limitedList.js (funciones puras)
-```
+### Chat público
+- Sala "Plaza Pública" a la que se unen automáticamente todos los usuarios registrados.
+- Mensajes en tiempo real con historial persistente.
 
-**Principios aplicados:**
-- **Responsabilidad única**: cada handler resuelve un solo tipo de mensaje; cada store gestiona un solo tipo de estado.
-- **Inyección de dependencias explícita**: nada importa estado global a ciegas; cada handler recibe sus dependencias (`clientRegistry`, `broadcaster`, etc.) como parámetros, lo que los hace testeables de forma aislada.
-- **Capas separadas**: la capa HTTP (Express) y la capa WebSocket no se conocen entre sí; ambas comparten solo `services/` y `state/`.
-- **Abierto a extensión**: añadir un nuevo tipo de mensaje = crear su `handler.js` + una línea en `websocket/handlers/index.js`. No se toca nada más.
+### Chat privado
+- Conversación 1 a 1 creada de forma automática (perezosa) al enviar el primer mensaje.
+- Indicador de presencia (en línea / última conexión).
+- Confirmación de entrega (✓) y lectura (✓✓) por mensaje.
 
-### Frontend (`public/js/`)
+### Grupos
+- Crear grupo, agregar/quitar participantes, renombrar y eliminar.
+- Roles **administrador** / **miembro**, con promoción automática si el admin abandona el grupo.
+- Historial persistente y notificaciones en tiempo real a todos los miembros.
 
-Sin build step: módulos ES nativos (`<script type="module">`), cargados directamente por el navegador.
+### Personalización visual
+- Gradientes predefinidos, URL de imagen externa o imagen propia (con validación de formato y límite de tamaño).
 
-```
-main.js                         ← punto de entrada: conecta el socket y arranca los controladores
-config/                         ← URLs del backend
-core/
-  socketClient.js                 (única capa que toca el WebSocket crudo)
-  state.js                        (único estado mutable de la app)
-services/
-  translationService.js           (traducción de textos + idiomas)
-  backgroundService.js            (personalización de fondo + localStorage)
-ui/                                (funciones de render — no contienen lógica de red)
-  dom.js, badge.js, toast.js, panelManager.js, confirmDialog.js,
-  messagesView.js, usersView.js, channelsView.js, navigation.js
-handlers/
-  incomingMessageHandlers.js      (traduce cada mensaje entrante del servidor a una actualización de UI)
-controllers/                      (conectan eventos del DOM con servicios/estado)
-  loginController.js, chatController.js, channelController.js,
-  backgroundController.js, sidebarController.js
-```
+### Traducción automática
+- Cada usuario ve los mensajes en su idioma preferido; el remitente ve siempre el original.
+- Arquitectura de **proveedores intercambiables**: `mock` (offline, por defecto), `google` (Google Cloud Translation) y `deepl`, configurables por variable de entorno sin tocar código.
+- Caché en dos niveles (memoria + base de datos) para no traducir el mismo mensaje dos veces.
+- Degradación controlada: si el proveedor de traducción falla, se muestra el texto original en vez de romper el chat.
 
-**Principios aplicados:**
-- **Un único punto de verdad para el estado** (`core/state.js`) en vez de variables globales sueltas.
-- **Separación vista / controlador**: los módulos de `ui/` solo dibujan; los de `controllers/` conectan clics con servicios.
-- **Sin parches sobre funciones existentes**: la detección de expulsión de un canal (antes implementada sobrescribiendo `renderizarCanales` desde fuera) ahora vive dentro de la propia función, en `channelsView.js`.
+### Reconexión y tolerancia a fallos
+- Si se pierde la conexión, los mensajes escritos se guardan localmente y se reenvían automáticamente al reconectar (sin duplicados, gracias a un id idempotente por mensaje).
+- Al reconectar, el cliente solo pide los mensajes que se perdió (sincronización incremental), no todo el historial.
+- Apagado ordenado del servidor (cierra conexiones activamente en vez de dejarlas colgadas).
+
+### Escalabilidad
+- Soporta múltiples instancias de Node.js detrás de un balanceador (Nginx), sincronizadas en tiempo real vía **Redis Adapter** de Socket.IO.
+- Presencia (usuarios en línea) calculada de forma distribuida con contadores en Redis, correcta aunque el mismo usuario tenga varias pestañas en distintos servidores.
+
+### Seguridad
+- Saneamiento de mensajes contra XSS (servidor + cliente).
+- Consultas parametrizadas contra inyección SQL.
+- Límite de peticiones (rate limiting) contra fuerza bruta en login/registro.
+- Cabeceras de seguridad con Helmet (configurables; ver sección 3.5 para uso en red local).
 
 ---
 
-## 🧪 Pruebas
+## 2. Tecnologías utilizadas
 
-Se incluye una suite de integración (`test/chat.test.js`, con el test runner nativo de Node) que levanta el servidor en un puerto efímero y verifica registro, mensajes públicos/privados, creación de canales, permisos de gestión y eliminación de canal:
+| Capa | Tecnología |
+|---|---|
+| Backend | Node.js 22+, Express 4 |
+| Tiempo real | Socket.IO 4, `@socket.io/redis-adapter` |
+| Base de datos | `node:sqlite` (nativo de Node, sin dependencias de compilación) |
+| Caché / Pub-Sub | Redis 7 (`ioredis`) |
+| Autenticación | `jsonwebtoken`, `bcryptjs` |
+| Validación | `zod` |
+| Seguridad | `helmet`, `cors`, `express-rate-limit`, `sanitize-html` |
+| Subida de archivos | `multer` |
+| Frontend | JavaScript (módulos ES nativos, sin framework ni build step), CSS propio |
+| Balanceo de carga | Nginx (`ip_hash`, failover) |
+| Pruebas | Playwright (E2E), script propio de carga/estrés con `socket.io-client` |
+
+---
+
+## 3. Instrucciones de ejecución
+
+### 3.1 Requisitos previos
+- **Node.js 22 o superior**
+- **Redis** (ver opciones abajo)
+- **Docker** (opcional, recomendado para Redis)
+
+### 3.2 Instalar dependencias
 
 ```bash
-npm test
+cd agora/backend
+npm install
 ```
 
+### 3.3 Configurar variables de entorno
+
+```bash
+cp .env.example .env
+```
+
+El archivo `.env` por defecto funciona para desarrollo local sin cambios.
+
+### 3.4 Levantar Redis
+
+**Opción recomendada — Docker:**
+
+```bash
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+```
+
+Para detener/reiniciar después:
+```bash
+docker stop redis
+docker start redis
+```
+
+**Alternativas (si no usas Docker):**
+
+```bash
+# macOS con Homebrew
+brew services start redis
+
+# Ubuntu / Debian / WSL2
+sudo apt install redis-server -y
+sudo service redis-server start
+
+# Windows nativo (sin Docker ni WSL2)
+# instalar desde https://github.com/tporadowski/redis/releases
+```
+
+**Sin Redis:** si solo vas a probar con un único usuario/instancia, puedes omitir Redis poniendo en `.env`:
+```env
+REDIS_ENABLED=false
+```
+
+### 3.5 Iniciar el servidor
+
+```bash
+npm start
+```
+
+Deberías ver:
+```
+[socket.io] adaptador Redis activo (instancia node-1)
+Agora [node-1] escuchando en http://localhost:3000
+```
+
+Abre **http://localhost:3000** en el navegador.
+
+### 3.6 Acceso desde otro dispositivo en la misma red (LAN/móvil)
+
+Por defecto, Helmet aplica cabeceras de seguridad (HSTS, CSP, etc.) pensadas para HTTPS. Al acceder por IP local en HTTP, esas cabeceras pueden hacer que el navegador intente forzar HTTPS y falle la carga de estilos/scripts. Para desarrollo/pruebas en LAN, en `backend/src/app.js` usa:
+
+```js
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+    hsts: false,
+  })
+);
+```
+
+> ⚠️ Esta configuración es para **desarrollo/LAN únicamente**. En producción, despliega detrás de HTTPS real (Nginx + TLS) y reactiva estas protecciones (ver `docs/ARCHITECTURE.md`, sección de seguridad).
+
+Luego, en tu PC ejecuta `ipconfig` (Windows) o `ifconfig`/`ip a` (Linux/macOS) para obtener tu IP local (ej. `192.168.1.105`), y desde el otro dispositivo entra a `http://192.168.1.105:3000`. Si no carga, revisa el firewall:
+
+```powershell
+New-NetFirewallRule -DisplayName "Agora Node" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow
+```
+
+### 3.7 Ejecutar con dos instancias (arquitectura distribuida)
+
+```bash
+# Terminal 1
+INSTANCE_ID=node-1 PORT=3000 npm start
+
+# Terminal 2
+INSTANCE_ID=node-2 PORT=3001 npm start
+```
+
+Ambas instancias comparten estado vía Redis. Para balancearlas con Nginx, usa la configuración incluida en `nginx/agora.conf`.
+
 ---
+
+## Estructura del proyecto
+
+```
+agora/
+├── backend/       → API REST + Socket.IO
+├── frontend/      → SPA en JavaScript puro
+├── nginx/         → configuración de balanceo de carga
+├── load-tests/    → script de prueba de carga/estrés
+└── docs/          → documentación técnica completa (ARCHITECTURE.md)
+```
+
+Para el detalle de arquitectura, modelo de datos, diagramas y justificaciones técnicas, consulta `docs/ARCHITECTURE.md`.
 
 ## 👥 Integrantes del Equipo
 
@@ -97,94 +199,6 @@ npm test
 | Ernesto Ramos | @netito74 |
 | Salvador Sanchez | @Develuengas |
 | Jose Enrique Gonzales | @tuX-2 |
-
----
-
-## 🚀 Funcionalidades
-
-- Chat en sala pública con historial.
-- Chat privado entre usuarios.
-- Traducción automática en tiempo real (LibreTranslate), por idioma de cada destinatario.
-- Canales de difusión con creador, miembros, gestión de miembros y eliminación.
-- Personalización del fondo del chat (color, degradado, URL de imagen o archivo local).
-- Indicador de "está escribiendo…".
-- Notificaciones toast no intrusivas (canal eliminado, expulsión de un canal).
-
----
-
-## 🛠️ Tecnologías
-
-**Frontend:** HTML5, CSS3, JavaScript (ES Modules nativos, sin build).
-**Backend:** Node.js, Express, `ws` (WebSocket).
-**Traducción:** LibreTranslate (autohosteado vía Docker).
-
----
-
-## 🔧 Requisitos
-
-- Node.js 18+ (se usa `fetch` nativo y el test runner integrado).
-- Docker (para LibreTranslate).
-
----
-
-## Instalación y ejecución
-
-### 1. Clonar el repositorio principal
-
-```bash
-git clone https://github.com/netito74/Chat-de-WebSockets.git
-cd Chat-de-WebSockets
-```
-
-### 2. Levantar LibreTranslate
-
-```bash
-git clone https://github.com/LibreTranslate/LibreTranslate.git
-cd LibreTranslate
-```
-
-Editar `docker-compose.yml` con:
-
-```yaml
-services:
-  libretranslate:
-    image: libretranslate/libretranslate:latest
-    container_name: libretranslate
-    ports:
-      - "5000:5000"
-    environment:
-      - LT_LOAD_ONLY=es,en,fr,de,it,pt
-      - LT_UPDATE_MODELS=true
-    volumes:
-      - libretranslate_models:/home/libretranslate/.local
-
-volumes:
-  libretranslate_models:
-```
-
-```bash
-docker-compose up -d
-```
-
-### 3. Configurar variables de entorno (opcional)
-
-```bash
-cp .env.example .env
-# Edita .env si necesitas otro puerto, host o límite de historial
-```
-
-### 4. Instalar dependencias y ejecutar
-
-```bash
-npm install
-npm start
-```
-
-### 5. Acceder a la aplicación
-
-```
-http://localhost:3000
-```
 
 ---
 
