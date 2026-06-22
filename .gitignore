@@ -10,7 +10,6 @@ yarn-error.log*
 
 # Variables de entorno
 .env
-.env.*
 
 # Base de datos SQLite (datos generados, no código)
 backend/data/
