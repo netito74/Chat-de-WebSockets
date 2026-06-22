@@ -12,6 +12,19 @@ yarn-error.log*
 .env
 .env.*
 
+# Base de datos SQLite (datos generados, no código)
+backend/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Imágenes de fondo subidas por usuarios
+backend/uploads/*
+!backend/uploads/.gitkeep
+!backend/uploads/backgrounds/
+backend/uploads/backgrounds/*
+!backend/uploads/backgrounds/.gitkeep
+
 # Archivos del sistema
 .DS_Store
 Thumbs.db
